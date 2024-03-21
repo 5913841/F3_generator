@@ -1,0 +1,5 @@
+.vscode
+perf.*
+*.pcap
+test*
+*.log
