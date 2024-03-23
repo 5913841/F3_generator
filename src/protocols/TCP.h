@@ -82,7 +82,9 @@ public:
     static uint16_t global_mss;
     static bool constructing_opt_tmeplate;
 
-    TCP() : state(TCP_CLOSE), L4_Protocol(ProtocolCode::PTC_TCP){};
+    TCP() : state(TCP_CLOSE) {};
+    ProtocolCode name() const { return ProtocolCode::PTC_TCP; }
+
     static tcphdr *decode_hdr_pre(rte_mbuf *data)
     {
         return rte_pktmbuf_mtod_offset(data, struct tcphdr *, -sizeof(struct tcphdr));
@@ -91,6 +93,8 @@ public:
     {
         return sizeof(struct tcphdr);
     }
+
+    template <typename Socket>
     int construct(Socket *socket, rte_mbuf *data)
     {
         int opt_len = 0;
@@ -126,6 +130,8 @@ public:
         rte_pktmbuf_prepend(data, sizeof(struct tcphdr));
         return sizeof(struct tcphdr) + opt_len;
     }
+
+    template <typename Socket>
     int process(Socket *socket, rte_mbuf *data);
 
     static int parse_packet_ft(rte_mbuf *data, FiveTuples *ft, int offset)
@@ -137,6 +143,7 @@ public:
         return sizeof(struct tcphdr);
     }
 
+    template <typename Socket>
     static int parse_packet_sk(rte_mbuf *data, Socket *sk, int offset)
     {
         sk->l4_protocol = parser_tcp;
@@ -146,12 +153,14 @@ public:
         return sizeof(struct tcphdr);
     }
 
+    template <typename Socket>
     static void parser_init()
     {
         L4_Protocol::parser.add_parser(parse_packet_ft);
-        L4_Protocol::parser.add_parser(parse_packet_sk);
+        L4_Protocol::parser.add_parser(parse_packet_sk<Socket>);
     }
-
+    
+    template <typename Socket>
     static void timer_init();
 };
 

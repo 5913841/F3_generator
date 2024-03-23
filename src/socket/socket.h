@@ -15,8 +15,6 @@
 
 typedef __uint128_t uint128_t;
 
-class Socket;
-
 struct ipaddr_t {
     union {
         struct in6_addr in6;
@@ -59,7 +57,6 @@ struct FiveTuples
     bool operator == (const FiveTuples& other) const;
     bool operator < (const FiveTuples& other) const;
     FiveTuples(){memset(this, 0, sizeof(FiveTuples));}
-    FiveTuples(const Socket& socket);
 
     static size_t hash(const FiveTuples& ft);
 };
@@ -72,22 +69,19 @@ struct FiveTuplesHash
     }
 };
 
+// template<typename l2_protocol_t = L2_Protocol, typename l3_protocol_t = L3_Protocol, typename l4_protocol_t = L4_Protocol, typename l5_protocol_t = L5_Protocol>
+template <typename l2_protocol_t, typename l3_protocol_t, typename l4_protocol_t, typename l5_protocol_t>
 struct Socket
 {
 public:
-    union{
-        Protocol* protocols[4];
-        struct {
-            L2_Protocol* l2_protocol;
-            L3_Protocol* l3_protocol;
-            L4_Protocol* l4_protocol;
-            L5_Protocol* l5_protocol;
-        };
-    };
     ipaddr_t src_addr;
     ipaddr_t dst_addr;
     uint16_t src_port;
     uint16_t dst_port;
+    l2_protocol_t l2_protocol;
+    l3_protocol_t l3_protocol;
+    l4_protocol_t l4_protocol;
+    l5_protocol_t l5_protocol;
     Socket(){src_addr = ipaddr_t(0); dst_addr = ipaddr_t(0); src_port = 0; dst_port = 0; memset(protocols, 0, sizeof(protocols));};
     Socket(const Socket& other): src_addr(other.src_addr), dst_addr(other.dst_addr), src_port(other.src_port), dst_port(other.dst_port)
     {
@@ -103,14 +97,25 @@ public:
     //     protocol_stack = protocol_stack_;
     // }
 
-    void set_protocol(int layer, Protocol* protocol)
+    operator FiveTuples() const
     {
-        protocols[layer] = protocol;
+        FiveTuples ft;
+        memset(&ft, 0, sizeof(ft));
+        ft.src_addr = src_addr;
+        ft.dst_addr = dst_addr;
+        ft.src_port = src_port;
+        ft.dst_port = dst_port;
+        ft.protocol_codes[0] = l2_protocol.code;
+        ft.protocol_codes[1] = l3_protocol.code;
+        ft.protocol_codes[2] = l4_protocol.code;
+        ft.protocol_codes[3] = l5_protocol.code;
+        return ft;
     }
 
     static size_t hash(const Socket& socket);
 };
 
+template<typename Socket>
 struct SocketPointerEqual
 {
     bool operator()(const Socket* s1, const Socket* s2) const
@@ -126,6 +131,7 @@ struct SocketPointerEqual
     }
 };
 
+template<typename Socket>
 struct SocketPointerHash 
 {
     size_t operator()(const Socket* socket) const

@@ -4,6 +4,7 @@
 #include "socket/socket.h"
 #include <parallel_hashmap/phmap.h>
 
+template<typename Socket>
 class SocketPointerTable
 {
 public:
@@ -13,7 +14,7 @@ public:
         socket_table.reserve(init_size);
     }
 
-    phmap::parallel_flat_hash_set<Socket *, SocketPointerHash, SocketPointerEqual> socket_table;
+    phmap::parallel_flat_hash_set<Socket *, SocketPointerHash<Socket>, SocketPointerEqual<Socket>> socket_table;
     Socket *find_socket(Socket *socket)
     {
         auto it = socket_table.find(socket);

@@ -60,6 +60,7 @@ static inline int http_header_match(const uint8_t *start, int name_len, int name
     return 0;
 }
 
+template<typename Socket>
 int http_ack_delay_flush()
 {
     int i = 0;
@@ -84,6 +85,7 @@ int http_ack_delay_flush()
     return 0;
 }
 
+template<typename Socket>
 static inline int http_parse_header_line(struct Socket *sk, const uint8_t *start, int name_len, int line_len)
 {
     int i = 0;
@@ -129,6 +131,7 @@ static inline int http_parse_header_line(struct Socket *sk, const uint8_t *start
 /*
  * headers must be in an mbuf
  * */
+template<typename Socket>
 static int http_parse_headers(struct Socket *sk, const uint8_t *data, int data_len)
 {
     HTTP* http = (HTTP*)sk->l5_protocol;
@@ -181,6 +184,7 @@ static int http_parse_headers(struct Socket *sk, const uint8_t *data, int data_l
 /*
  * https://datatracker.ietf.org/doc/html/rfc7230
  * */
+template<typename Socket>
 static inline int http_parse_chunk(struct Socket *sk, const uint8_t *data, int data_len)
 {
     HTTP* http = (HTTP*)sk->l5_protocol;
@@ -307,6 +311,7 @@ chunk_end:
     }
 }
 
+template<typename Socket>
 static inline int http_parse_body(struct Socket *sk, const uint8_t *data, int data_len)
 {
     HTTP* http = (HTTP*)sk->l5_protocol;
@@ -331,6 +336,7 @@ static inline int http_parse_body(struct Socket *sk, const uint8_t *data, int da
     }
 }
 
+template<typename Socket>
 int http_parse_run(struct Socket *sk, const uint8_t *data, int data_len)
 {
     HTTP* http = (HTTP*)sk->l5_protocol;

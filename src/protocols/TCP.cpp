@@ -45,6 +45,7 @@ bool tcp_seq_ge(uint32_t a, uint32_t b)
     return (a - b) < 0x80000000;
 }
 
+template <typename Socket>
 inline struct rte_mbuf *tcp_new_packet(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
 {
     uint16_t csum_ip = 0;
@@ -106,6 +107,7 @@ inline struct rte_mbuf *tcp_new_packet(TCP *tcp, struct Socket *sk, uint8_t tcp_
     return m;
 }
 
+template <typename Socket>
 inline void tcp_send_packet(TCP *tcp, rte_mbuf *m, struct Socket *sk)
 {
     netif_port *port = ((ETHER *)(sk->l2_protocol))->port;
@@ -126,6 +128,7 @@ static void tcp_socket_close(TCP *tcp, struct Socket *sk)
     }
 }
 
+template <typename Socket>
 static inline void tcp_process_rst(TCP *tcp, struct Socket *sk, struct rte_mbuf *m)
 {
 #ifdef DPERF_DEBUG
@@ -155,6 +158,7 @@ inline bool tcp_in_duration(TCP *tcp)
     }
 }
 
+template <typename Socket>
 static inline void tcp_send_keepalive_request(TCP *tcp, struct Socket *sk)
 {
     if (tcp_in_duration(tcp))
@@ -213,17 +217,8 @@ static inline int tcp_do_keepalive(TCP *tcp, struct Socket *sk, uint64_t now_tsc
     return -1;
 }
 
-struct KeepAliveTimer : public Timer {
-    Socket *sk;
-    KeepAliveTimer(Socket *sk) : sk(sk) {}
-    int callback() override
-    {
-        TCP* tcp = (TCP*)sk->l4_protocol;
-        return tcp_do_keepalive(tcp, sk, current_ts_msec());
-    }
 
-};
-
+template <typename Socket>
 static inline int tcp_do_timeout(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
     if (now_tsc < tcp->timer_tsc)
@@ -234,16 +229,8 @@ static inline int tcp_do_timeout(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
     return -1;
 }
 
-struct TimeoutTimer : public Timer {
-    Socket *sk;
-    TimeoutTimer(Socket *sk) : sk(sk) {}
-    int callback() override
-    {
-        TCP* tcp = (TCP*)sk->l4_protocol;
-        return tcp_do_timeout(tcp, sk, current_ts_msec());
-    }
-};
 
+template <typename Socket>
 static inline int tcp_do_retransmit(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
     if (now_tsc < tcp->timer_tsc)
@@ -309,16 +296,7 @@ static inline int tcp_do_retransmit(TCP *tcp, struct Socket *sk, uint64_t now_ts
     return -1;
 }
 
-struct RetransmitTimer : public Timer {
-    Socket *sk;
-    RetransmitTimer(Socket *sk) : sk(sk) {}
-    int callback() override
-    {
-        TCP* tcp = (TCP*)sk->l4_protocol;
-        return tcp_do_retransmit(tcp, sk, current_ts_msec());
-    }
-};
-
+template <typename Socket>
 static inline void tcp_start_retransmit_timer(TCP *tcp, Socket *sk, uint64_t now_tsc)
 {
     if (tcp->snd_nxt != tcp->snd_una)
@@ -328,6 +306,7 @@ static inline void tcp_start_retransmit_timer(TCP *tcp, Socket *sk, uint64_t now
     }
 }
 
+template <typename Socket>
 static inline void tcp_start_timeout_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
     tcp->timer_tsc = now_tsc;
@@ -335,6 +314,7 @@ static inline void tcp_start_timeout_timer(TCP *tcp, struct Socket *sk, uint64_t
     TIMERS.add_job(new TimeoutTimer(sk), now_tsc + timeout_tsc);
 }
 
+template <typename Socket>
 static inline void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
     if (tcp->keepalive && (tcp->snd_nxt == tcp->snd_una))
@@ -344,11 +324,12 @@ static inline void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64
     }
 }
 
+template <typename Socket>
 void TCP::timer_init()
 {
-    TIMERS.add_timers(SpecificTimers(new KeepAliveTimer(NULL)));
-    TIMERS.add_timers(SpecificTimers(new RetransmitTimer(NULL)));
-    TIMERS.add_timers(SpecificTimers(new TimeoutTimer(NULL)));
+    TIMERS.add_timers(SpecificTimers(new KeepAliveTimer<Socket>(NULL)));
+    TIMERS.add_timers(SpecificTimers(new RetransmitTimer<Socket>(NULL)));
+    TIMERS.add_timers(SpecificTimers(new TimeoutTimer<Socket>(NULL)));
 }
 
 inline uint64_t tcp_accurate_timer_tsc(TCP *tcp, uint64_t now_tsc)
@@ -366,6 +347,7 @@ inline uint64_t tcp_accurate_timer_tsc(TCP *tcp, uint64_t now_tsc)
     return now_tsc;
 }
 
+template <typename Socket>
 struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
 {
     struct rte_mbuf *m = NULL;
@@ -448,6 +430,7 @@ static void tcp_rst_set_ip(struct iphdr *iph)
     iph->daddr = htonl(daddr);
 }
 
+template <typename Socket>
 inline void tcp_reply_rst(TCP *tcp, Socket *sk, struct ether_header *eth, struct iphdr *iph, struct tcphdr *th, rte_mbuf *m, int olen)
 {
     int nlen = 0;
@@ -481,6 +464,7 @@ inline void tcp_reply_rst(TCP *tcp, Socket *sk, struct ether_header *eth, struct
     // net_stats_rst_tx();
     tcp_send_packet(tcp, m, sk);
 }
+
 static inline uint8_t *tcp_data_get(struct iphdr *iph, struct tcphdr *th, uint16_t *data_len)
 {
     struct ip6_hdr *ip6h = (struct ip6_hdr *)iph;
@@ -513,6 +497,7 @@ inline void tcp_stop_retransmit_timer(TCP *tcp)
     tcp->retrans = 0;
 }
 
+template <typename Socket>
 static inline void tcp_reply_more(struct TCP *tcp, struct Socket *sk)
 {
     int i = 0;
@@ -543,6 +528,7 @@ static inline void tcp_reply_more(struct TCP *tcp, struct Socket *sk)
     }
 }
 
+template <typename Socket>
 static inline bool tcp_check_sequence(struct TCP *tcp, struct Socket *sk, struct tcphdr *th, uint16_t data_len)
 {
     uint32_t ack = ntohl(th->th_ack);
@@ -664,6 +650,7 @@ static inline bool tcp_check_sequence(struct TCP *tcp, struct Socket *sk, struct
     return false;
 }
 
+template <typename Socket>
 inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rte_mbuf *m, struct tcphdr *th)
 {
     /* fast recycle */
@@ -713,6 +700,7 @@ inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rt
     mbuf_free2(m);
 }
 
+template <typename Socket>
 inline void tcp_client_process_syn_ack(struct TCP *tcp, struct Socket *sk,
                                        struct rte_mbuf *m, struct tcphdr *th)
 {
@@ -758,6 +746,7 @@ inline void tcp_client_process_syn_ack(struct TCP *tcp, struct Socket *sk,
     mbuf_free2(m);
 }
 
+template <typename Socket>
 inline uint8_t tcp_process_fin(TCP *tcp, struct Socket *sk, uint8_t rx_flags, uint8_t tx_flags)
 {
     uint8_t flags = 0;
@@ -813,6 +802,7 @@ inline uint8_t tcp_process_fin(TCP *tcp, struct Socket *sk, uint8_t rx_flags, ui
     return tx_flags | flags;
 }
 
+template <typename Socket>
 static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, struct rte_mbuf *m,
                                            struct iphdr *iph, struct tcphdr *th)
 {
@@ -895,6 +885,7 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
     mbuf_free2(m);
 }
 
+template <typename Socket>
 inline void tcp_server_process(TCP *tcp, Socket *sk, ether_header *eth_hdr, iphdr *ip_hdr, tcphdr *tcp_hdr, rte_mbuf *data, int olen)
 {
 
@@ -921,6 +912,7 @@ inline void tcp_server_process(TCP *tcp, Socket *sk, ether_header *eth_hdr, iphd
     }
 }
 
+template <typename Socket>
 static inline void tcp_client_process_data(struct TCP *tcp, struct Socket *sk, struct rte_mbuf *m,
                                            struct iphdr *iph, struct tcphdr *th)
 {
@@ -990,6 +982,7 @@ static inline void tcp_client_process_data(struct TCP *tcp, struct Socket *sk, s
     mbuf_free2(m);
 }
 
+template <typename Socket>
 inline void tcp_client_process(TCP *tcp, Socket *sk, ether_header *eth_hdr, iphdr *ip_hdr, tcphdr *tcp_hdr, rte_mbuf *data, int olen)
 {
 
@@ -1017,6 +1010,7 @@ inline void tcp_client_process(TCP *tcp, Socket *sk, ether_header *eth_hdr, iphd
     }
 }
 
+template <typename Socket>
 int TCP::process(Socket *sk, rte_mbuf *data)
 {
     ether_header *eth_hdr = rte_pktmbuf_mtod(data, struct ether_header *);
@@ -1051,6 +1045,7 @@ int TCP::process(Socket *sk, rte_mbuf *data)
     return 0;
 }
 
+template <typename Socket>
 Socket *tcp_new_socket(const Socket *template_socket)
 {
     Socket *socket = new Socket(*template_socket);
@@ -1059,6 +1054,7 @@ Socket *tcp_new_socket(const Socket *template_socket)
     return socket;
 }
 
+template <typename Socket>
 void tcp_release_socket(Socket *socket)
 {
     delete (TCP *)socket->l4_protocol;
@@ -1066,6 +1062,7 @@ void tcp_release_socket(Socket *socket)
     delete socket;
 }
 
+template <typename Socket>
 void tcp_launch(Socket *socket)
 {
     TCP *tcp = (TCP *)socket->l4_protocol;

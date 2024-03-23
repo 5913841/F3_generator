@@ -11,22 +11,26 @@
 #include "protocols/HTTP.h"
 #include "socket/socket_table/socket_table.h"
 #include "socket/socket_tree/socket_tree.h"
+#include "socket/socket.h"
 #include "protocols/base_protocol.h"
 #include <rte_lcore.h>
 
 // #define RTE_PKTMBUF_HEADROOM 256
 #define MBUF_SIZE (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 
+typedef Socket<ETHER, IPV4, TCP, HTTP> Socket_t;
+typedef SocketPointerTable<Socket_t> SocketPointerTable_t;
+
 ETHER *ether = new ETHER();
 IPV4 *ip = new IPV4();
 TCP *template_tcp = new TCP();
 HTTP *template_http = new HTTP();
-Socket *template_socket = new Socket();
+Socket_t *template_socket = new Socket_t();
 mbuf_cache *template_tcp_data = new mbuf_cache();
 mbuf_cache *template_tcp_opt = new mbuf_cache();
 mbuf_cache *template_tcp_pkt = new mbuf_cache();
 const char *data;
-SocketPointerTable *socket_table = new SocketPointerTable();
+SocketPointerTable_t *socket_table = new SocketPointerTable_t();
 
 ipaddr_t target_ip("10.233.1.1");
 
@@ -44,7 +48,7 @@ dpdk_config config = dpdk_config(&usrconfig);
 
 void config_ether_variables()
 {
-    ETHER::parser_init();
+    ETHER::parser_init<Socket_t>();
     ether->port = config.ports + 0;
     ether->queue_id = 0;
     ether->tq = new tx_queue();
@@ -54,14 +58,14 @@ void config_ether_variables()
 
 void config_ip_variables()
 {
-    IPV4::parser_init();
+    IPV4::parser_init<Socket_t>();
     return;
 }
 
 void config_tcp_variables()
 {
-    TCP::parser_init();
-    TCP::timer_init();
+    TCP::parser_init<Socket_t>();
+    TCP::timer_init<Socket_t>();
     TCP::flood = 0;
     TCP::server = 0;
     // TCP::send_window = SEND_WINDOW_DEFAULT;
@@ -95,7 +99,7 @@ void config_tcp_variables()
 
 void config_http_variables()
 {
-    HTTP::parser_init();
+    HTTP::parser_init<Socket_t>();
     HTTP::payload_size = 64;
     HTTP::payload_random = false;
     strcpy(HTTP::http_host, HTTP_HOST_DEFAULT);
@@ -113,10 +117,10 @@ void config_socket()
     template_socket->dst_addr = target_ip;
     template_socket->src_port = 0;
     template_socket->dst_port = 0;
-    template_socket->set_protocol(SOCKET_L2, ether);
-    template_socket->set_protocol(SOCKET_L3, ip);
-    template_socket->set_protocol(SOCKET_L4, template_tcp);
-    template_socket->set_protocol(SOCKET_L5, template_http);
+    template_socket->l2_protocol = *ether;
+    template_socket->l3_protocol = *ip;
+    template_socket->l4_protocol = *template_tcp;
+    template_socket->l5_protocol = *template_http;
 }
 
 void config_template_pkt()
@@ -142,9 +146,9 @@ int start_test(__rte_unused void *arg1)
         do{
             m = recv_packet_by_queue(rq, config.ports[0].id, 0);
             if (m != nullptr){
-                Socket* parser_socket = new Socket();
+                Socket_t* parser_socket = new Socket_t();
                 parse_packet(m, parser_socket);
-                Socket* socket = socket_table->find_socket(parser_socket);
+                Socket_t* socket = socket_table->find_socket(parser_socket);
                 socket->l4_protocol->process(socket, m);
             }
         } while(m!= nullptr);
@@ -156,7 +160,7 @@ int start_test(__rte_unused void *arg1)
                 break;
             }
             for(int i = 0; i < 100000; i++){
-                Socket* socket = tcp_new_socket(template_socket);
+                Socket_t* socket = tcp_new_socket(template_socket);
 
                 socket->dst_port = rand() % 20 + 1;
                 socket->src_port = rand();

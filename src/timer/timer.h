@@ -15,6 +15,8 @@ uint64_t current_ts_msec();
 // Return monotonic timestamp in usecs
 uint64_t current_ts_usec();
 
+
+template <typename SpecificTimer>
 class Timer
 {
 public:
@@ -22,7 +24,7 @@ public:
 
     Timer(uint64_t ts_msec);
 
-    static int id;
+    static uint64_t delay;
 
     // Timestamp in msecs
     uint64_t ts_msec;
@@ -30,47 +32,30 @@ public:
     Timer *next;
 
     // Compare two timers
-    bool operator<(const Timer &other) const;
-
-    virtual int callback() { return 0; };
+    bool operator<(const Timer<SpecificTimer> &other) const;
+    int callback(){};
 };
 
-class SpecificTimers
+template <typename SpecificTimer>
+class TimerList
 {
     friend class TimersGroup;
 
 private:
-    Timer *head;
-    Timer *tail;
-    uint64_t delay;
+    Timer<SpecificTimer> *head;
+    Timer<SpecificTimer> *tail;
 
 public:
-    SpecificTimers();
-    SpecificTimers(Timer *head);
+    TimerList();
+    TimerList(Timer<SpecificTimer> *head);
+
 
     // Trigger timers
     void trigger();
 
     // Add job to timers
-    void add_job(Timer *tm, uint64_t ts_msec);
-
-    // Schedule job to timers in msecs later
-    void schedule_job(Timer *tm, uint64_t delay_msec);
+    void add_job(SpecificTimer *tm);
 };
 
-struct TimersGroup
-{
-    std::vector<SpecificTimers> timers_group;
-
-    TimersGroup(){};
-
-    void add_timers(SpecificTimers timers);
-
-    void add_job(Timer *tm, uint64_t ts_msec);
-
-    void trigger();
-};
-
-extern __thread TimersGroup TIMERS;
 
 #endif

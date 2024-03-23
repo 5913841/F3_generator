@@ -17,13 +17,17 @@ extern IPV4* parser_ipv4;
 
 class IPV4 : public L3_Protocol {
 public:
-    IPV4() : L3_Protocol(ProtocolCode::PTC_IPV4) {}
+    ProtocolCode name() const { return ProtocolCode::PTC_IPV4; }
     static inline iphdr* decode_hdr_pre(rte_mbuf* data) {
         return rte_pktmbuf_mtod_offset(data, struct iphdr*, -sizeof(struct iphdr));
     }
+
+    template<typename Socket>
     size_t get_hdr_len(Socket* socket, rte_mbuf* data) {
         return sizeof(struct iphdr);
     }
+
+    template<typename Socket>
     inline int construct(Socket* socket, rte_mbuf* data) {
         iphdr* ip = decode_hdr_pre(data);
         ip->version = 4;
@@ -59,6 +63,7 @@ public:
         return sizeof(struct iphdr);
     }
 
+    template<typename Socket>
     static int parse_packet_sk(rte_mbuf* data, Socket* sk, int offset) {
         sk->l3_protocol = parser_ipv4;
         iphdr* ip = rte_pktmbuf_mtod_offset(data, struct iphdr*, offset);
@@ -68,16 +73,17 @@ public:
         return sizeof(struct iphdr);
     }
 
+    template<typename Socket>
     static void parser_init()
     {
         L3_Protocol::parser.add_parser(parse_packet_ft);
-        L3_Protocol::parser.add_parser(parse_packet_sk);
+        L3_Protocol::parser.add_parser(parse_packet_sk<Socket>);
     }
 };
 
 class IPV6 : public Protocol {
 public:
-    IPV6() : Protocol(ProtocolCode::PTC_IPV6) {}
+    ProtocolCode name() const { return ProtocolCode::PTC_IPV6; }
     static inline ip6_hdr* decode_hdr_pre(rte_mbuf* data) {
         return rte_pktmbuf_mtod_offset(data, struct ip6_hdr*, -sizeof(struct ip6_hdr));
     }

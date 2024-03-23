@@ -1,5 +1,6 @@
 #include "socket/socket.h"
 #include <hash_map>
+
 bool FiveTuples::operator == (const FiveTuples& other) const
 {
     // return likely(src_addr == other.src_addr &&
@@ -41,18 +42,7 @@ bool FiveTuples::operator < (const FiveTuples& other) const
     return false;
 }
 
-FiveTuples::FiveTuples(const Socket& socket)
-{
-    memset(this, 0, sizeof(FiveTuples));
-    src_addr = socket.src_addr;
-    dst_addr = socket.dst_addr;
-    src_port = socket.src_port;
-    dst_port = socket.dst_port;
-    for(int i = 0; i < 4; i++)
-    {
-        protocol_codes[i] = socket.protocols+i == nullptr ? ProtocolCode::PTC_NONE : socket.protocols[i]->name;
-    }
-}
+
 
 size_t FiveTuples::hash(const FiveTuples& ft)
 {
@@ -74,7 +64,8 @@ size_t FiveTuples::hash(const FiveTuples& ft)
     return hash_value;
 }
 
-size_t Socket::hash(const Socket& sk)
+template<typename l2_protocol, typename l3_protocol, typename l4_protocol, typename l5_protocol>
+size_t Socket<l2_protocol, l3_protocol, l4_protocol, l5_protocol>::hash(const Socket& sk)
 {
     size_t hash_value = 0x12345678;
     hash_value += std::hash<uint32_t>()(sk.src_addr.in6.s6_addr32[0]);
@@ -87,9 +78,9 @@ size_t Socket::hash(const Socket& sk)
     hash_value += std::hash<uint32_t>()(sk.dst_addr.in6.s6_addr32[3]);
     hash_value += std::hash<uint16_t>()(sk.src_port);
     hash_value += std::hash<uint16_t>()(sk.dst_port);
-    for(int i = 0; i < 4; i++)
-    {
-        hash_value += std::hash<uint8_t>()(sk.protocols[i]->name);
-    }
+    hash_value += std::hash<uint8_t>()(sk.l2_protocol.name);
+    hash_value += std::hash<uint8_t>()(sk.l3_protocol.name);
+    hash_value += std::hash<uint8_t>()(sk.l4_protocol.name);
+    hash_value += std::hash<uint8_t>()(sk.l5_protocol.name);
     return hash_value;
 }

@@ -54,13 +54,16 @@ public:
     } ack_delay;
 // #endif
     HTTP_STATE state;
-    HTTP() : L5_Protocol(ProtocolCode::PTC_HTTP) {}
+    ProtocolCode name() const { return ProtocolCode::PTC_HTTP; }
+    template<typename Socket>
     inline size_t get_hdr_len(Socket* socket, rte_mbuf* data) {
         return 0;
     }
+    template<typename Socket>
     inline int construct(Socket* socket, rte_mbuf* data) {
         return 0;
     }
+    template<typename Socket>
     inline void process(Socket* socket, rte_mbuf* data) {
 
     }
@@ -70,15 +73,17 @@ public:
         return 0;
     }
 
+    template<typename Socket>
     static int parse_packet_sk(rte_mbuf* data, Socket* sk, int offset) {
         sk->l5_protocol = parser_http;
         return 0;
     }
 
+    template<typename Socket>
     static void parser_init()
     {
         L5_Protocol::parser.add_parser(parse_packet_ft);
-        L5_Protocol::parser.add_parser(parse_packet_sk);
+        L5_Protocol::parser.add_parser(parse_packet_sk<Socket>);
     }
 };
 
@@ -117,6 +122,7 @@ const char *http_get_response(void);
 // #ifdef HTTP_PARSE
 int http_ack_delay_flush();
 
+template<typename Socket>
 static inline void http_ack_delay_add(struct Socket *sk)
 {
     HTTP* http = (HTTP*)sk->l5_protocol;
@@ -158,6 +164,7 @@ static inline void socket_init_http_server(struct HTTP *http, TCP* tcp)
 
 int http_parse_run(struct Socket *sk, const uint8_t *data, int data_len);
 
+template<typename Socket>
 static inline uint8_t http_client_process_data(struct Socket *sk,
     uint8_t rx_flags, uint8_t *data, uint16_t data_len)
 {

@@ -28,18 +28,24 @@ public:
     netif_port* port;
     int queue_id;
     tx_queue* tq;
-    ETHER() : L2_Protocol(ProtocolCode::PTC_ETH), port(nullptr) {}
-    ETHER(netif_port* port) : L2_Protocol(ProtocolCode::PTC_ETH), port(port) {}
+
+    ProtocolCode name() { return ProtocolCode::PTC_ETH; }
+    ETHER() {}
+    ETHER(netif_port* port) : port(port) {}
     static inline ether_header* decode_hdr_pre(rte_mbuf* data) {
         return rte_pktmbuf_mtod_offset(data, struct ether_header*, -sizeof(struct ether_header));
     }
     static inline ether_header* decode_hdr(rte_mbuf* data) {
         return rte_pktmbuf_mtod_offset(data, struct ether_header*, 0);
     }
-    size_t get_hdr_len(Socket* socket, rte_mbuf* data) override {
+
+    template<typename Socket>
+    size_t get_hdr_len(Socket* socket, rte_mbuf* data) {
         return sizeof(struct ether_header);
     }
-    int construct(Socket* socket, rte_mbuf* data) override {
+    
+    template<typename Socket>
+    int construct(Socket* socket, rte_mbuf* data) {
         ether_header* eth = decode_hdr_pre(data);
 
         if(socket->l3_protocol->name == ProtocolCode::PTC_IPV4){
@@ -56,7 +62,10 @@ public:
 
         return sizeof(struct ether_header);
     }
-    int send_frame(Socket* socket, rte_mbuf* data) override {
+
+    
+    template<typename Socket>
+    int send_frame(Socket* socket, rte_mbuf* data) {
         construct(socket, data);
 
         send_packet_by_queue(tq, data, port->id, queue_id);
@@ -68,15 +77,17 @@ public:
         return sizeof(struct ether_header);
     }
 
+    template<typename Socket>
     static int parse_packet_sk(rte_mbuf* data, Socket* sk, int offset) {
         sk->l2_protocol = parser_eth;
         return sizeof(struct ether_header);
     }
 
+    template<typename Socket>
     static void parser_init()
     {
         L2_Protocol::parser.add_parser(parse_packet_ft);
-        L2_Protocol::parser.add_parser(parse_packet_sk);
+        L2_Protocol::parser.add_parser(parse_packet_sk<Socket>);
     }
 };
 

@@ -23,6 +23,7 @@ int PacketParser::parse_packet(rte_mbuf* data, FiveTuples* ft, int offset){
     
 }
 
+template<typename Socket>
 int PacketParser::parse_packet(rte_mbuf* data, Socket* sk, int offset){
     for(int i = 0; i < parser_socket_num; i++)
     {
@@ -94,6 +95,7 @@ int parse_packet(rte_mbuf* data, FiveTuples* ft) {
     return offset;
 }
 
+template<typename Socket>
 int parse_packet(rte_mbuf* data, Socket* sk) {
     int offset = 0;
     int res = L2_Protocol::parser.parse_packet(data, sk, offset);
