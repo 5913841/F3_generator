@@ -5,7 +5,8 @@
 #include "common/define.h"
 #include "common/packets.h"
 
-class GenThread {
+class GenThread
+{
 public:
     uint8_t core_id;
     uint8_t port_id;
@@ -13,7 +14,6 @@ public:
     struct netif_port *port;
     struct tx_queue mbuf_tx;
     struct rx_queue mbuf_rx;
-    
 };
 
 #endif /* __GEN_THREAD_H__ */

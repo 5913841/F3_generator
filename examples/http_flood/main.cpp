@@ -30,14 +30,14 @@ SocketPointerTable *socket_table = new SocketPointerTable();
 
 ipaddr_t target_ip("10.233.1.1");
 
-rx_queue *rq = new rx_queue();
-
 dpdk_config_user usrconfig = {
     .lcores = {0},
     .ports = {"0000:01:00.0"},
     .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
-
+    .always_accurate_time = true,
+    .tx_burst_size = 10000,
+    .rx_burst_size = 10000,
 };
 
 dpdk_config config = dpdk_config(&usrconfig);
@@ -46,10 +46,6 @@ void config_ether_variables()
 {
     ETHER::parser_init();
     ether->port = config.ports + 0;
-    ether->queue_id = 0;
-    ether->tq = new tx_queue();
-    ether->tq->tx_burst = TX_BURST_DEFAULT;
-    rq->rx_burst = RX_BURST_MAX;
 }
 
 void config_ip_variables()
@@ -64,8 +60,8 @@ void config_tcp_variables()
     TCP::timer_init();
     TCP::flood = 0;
     TCP::server = 0;
-    // TCP::send_window = SEND_WINDOW_DEFAULT;
-    TCP::send_window = 0;
+    TCP::send_window = SEND_WINDOW_DEFAULT;
+    // TCP::send_window = 0;
     TCP::template_tcp_data = template_tcp_data;
     TCP::template_tcp_opt = template_tcp_opt;
     TCP::template_tcp_pkt = template_tcp_pkt;
@@ -82,7 +78,7 @@ void config_tcp_variables()
     TCP::use_http = true;
     TCP::global_mss = MSS_IPV4;
     data = TCP::server ? http_get_response() : http_get_request();
-    template_tcp->timer_tsc = current_ts_msec();
+    template_tcp->timer_tsc = 0;
     template_tcp->retrans = 0;
     template_tcp->keepalive_request_num = 0;
     template_tcp->keepalive = TCP::global_keepalive;
@@ -132,36 +128,40 @@ void config_template_pkt()
 
 int start_test(__rte_unused void *arg1)
 {
-
-    uint64_t last_tsc = current_ts_msec();
     ipaddr_t base_src = ipaddr_t("10.233.1.2");
     uint64_t begin_ts = current_ts_msec();
     while (true)
     {
         rte_mbuf *m = nullptr;
-        do{
-            m = recv_packet_by_queue(rq, config.ports[0].id, 0);
-            if (m != nullptr){
-                Socket* parser_socket = new Socket();
+        do
+        {
+            m = dpdk_config_percore::cfg_recv_packet();
+            if (m != nullptr)
+            {
+                Socket *parser_socket = new Socket();
                 parse_packet(m, parser_socket);
-                Socket* socket = socket_table->find_socket(parser_socket);
-                socket->l4_protocol->process(socket, m);
+                Socket *socket = socket_table->find_socket(parser_socket);
+                if (socket != nullptr) socket->l4_protocol->process(socket, m);
             }
-        } while(m!= nullptr);
-        tx_queue_flush(ether->tq, config.ports[0].id, 0);
+        } while (m != nullptr);
+        dpdk_config_percore::cfg_send_flush();
 
-        if (current_ts_msec() - last_tsc > 1000) {
-            last_tsc = current_ts_msec();
-            if(last_tsc - begin_ts > 60 * 1000) {
-                break;
-            }
-            for(int i = 0; i < 100000; i++){
-                Socket* socket = tcp_new_socket(template_socket);
+        if (current_ts_msec() - begin_ts > 10 * 1000)
+        {
+            break;
+        }
+
+        if (dpdk_config_percore::check_epoch_timer(0.000001 * TSC_PER_SEC))
+        {
+            for (int i = 0; i < 10; i++)
+            {
+                Socket *socket = tcp_new_socket(template_socket);
 
                 socket->dst_port = rand() % 20 + 1;
                 socket->src_port = rand();
                 socket->src_addr = rand() % 11 + base_src;
-                if(socket_table->insert_socket(socket) == -1){
+                if (socket_table->insert_socket(socket) == -1)
+                {
                     delete socket;
                     continue;
                 }

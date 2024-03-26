@@ -4,6 +4,7 @@
 #include "timer/timer.h"
 #include "protocols/HTTP.h"
 #include "dpdk/csum.h"
+#include "panel/panel.h"
 
 bool TCP::flood;
 bool TCP::server;
@@ -14,7 +15,7 @@ mbuf_cache *TCP::template_tcp_pkt;
 int TCP::global_duration_time;
 bool TCP::global_keepalive;
 bool TCP::global_stop;
-/* tsc */
+// ms
 uint64_t TCP::keepalive_request_interval;
 int TCP::setted_keepalive_request_num;
 std::function<void(Socket *sk)> TCP::release_socket_callback;
@@ -43,6 +44,37 @@ bool tcp_seq_gt(uint32_t a, uint32_t b)
 bool tcp_seq_ge(uint32_t a, uint32_t b)
 {
     return (a - b) < 0x80000000;
+}
+
+
+static inline void tcp_flags_rx_count(uint8_t tcp_flags)
+{
+    if (tcp_flags & TH_SYN) {
+        net_stats_syn_rx();
+    }
+
+    if (tcp_flags & TH_FIN) {
+        net_stats_fin_rx();
+    }
+
+    if (tcp_flags & TH_RST) {
+        net_stats_rst_rx();
+    }
+}
+
+static inline void tcp_flags_tx_count(uint8_t tcp_flags)
+{
+    if (tcp_flags & TH_SYN) {
+        net_stats_syn_tx();
+    }
+
+    if (tcp_flags & TH_FIN) {
+        net_stats_fin_tx();
+    }
+
+    if (tcp_flags & TH_RST) {
+        net_stats_rst_tx();
+    }
 }
 
 inline struct rte_mbuf *tcp_new_packet(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
@@ -108,11 +140,8 @@ inline struct rte_mbuf *tcp_new_packet(TCP *tcp, struct Socket *sk, uint8_t tcp_
 
 inline void tcp_send_packet(TCP *tcp, rte_mbuf *m, struct Socket *sk)
 {
-    netif_port *port = ((ETHER *)(sk->l2_protocol))->port;
-    int queue_id = ((ETHER *)(sk->l2_protocol))->queue_id;
-    tx_queue *tx_queue = ((ETHER *)(sk->l2_protocol))->tq;
     csum_offload_ip_tcpudp(m, RTE_MBUF_F_TX_TCP_CKSUM);
-    send_packet_by_queue(tx_queue, m, port->id, queue_id);
+    dpdk_config_percore::cfg_send_packet(m);
 }
 
 static void tcp_socket_close(TCP *tcp, struct Socket *sk)
@@ -194,7 +223,7 @@ static inline int tcp_do_keepalive(TCP *tcp, struct Socket *sk, uint64_t now_tsc
                 tcp_reply(tcp, sk, TH_SYN);
                 tcp->snd_una = tcp->snd_nxt;
                 // socket_start_keepalive_timer(sk, work_space_tsc(ws));
-                tcp->timer_tsc = current_ts_msec();
+                tcp->timer_tsc = time_in_config();
                 return tcp->keepalive_request_interval;
             }
             else
@@ -213,16 +242,21 @@ static inline int tcp_do_keepalive(TCP *tcp, struct Socket *sk, uint64_t now_tsc
     return -1;
 }
 
-struct KeepAliveTimer : public Timer {
+struct KeepAliveTimer : public Timer<KeepAliveTimer>
+{
     Socket *sk;
     KeepAliveTimer(Socket *sk) : sk(sk) {}
+    uint64_t delay_tsc() override
+    {
+        return TCP::keepalive_request_interval * (g_tsc_per_second / 1000);
+    }
     int callback() override
     {
-        TCP* tcp = (TCP*)sk->l4_protocol;
-        return tcp_do_keepalive(tcp, sk, current_ts_msec());
+        TCP *tcp = (TCP *)sk->l4_protocol;
+        return tcp_do_keepalive(tcp, sk, time_in_config());
     }
-
 };
+template class Timer<KeepAliveTimer>;
 
 static inline int tcp_do_timeout(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
@@ -234,15 +268,21 @@ static inline int tcp_do_timeout(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
     return -1;
 }
 
-struct TimeoutTimer : public Timer {
+struct TimeoutTimer : public Timer<TimeoutTimer>
+{
     Socket *sk;
     TimeoutTimer(Socket *sk) : sk(sk) {}
+    uint64_t delay_tsc() override
+    {
+        return ((RETRANSMIT_TIMEOUT * RETRANSMIT_NUM_MAX) + TCP::keepalive_request_interval) * (g_tsc_per_second / 1000);
+    }
     int callback() override
     {
-        TCP* tcp = (TCP*)sk->l4_protocol;
-        return tcp_do_timeout(tcp, sk, current_ts_msec());
+        TCP *tcp = (TCP *)sk->l4_protocol;
+        return tcp_do_timeout(tcp, sk, time_in_config());
     }
 };
+template class Timer<TimeoutTimer>;
 
 static inline int tcp_do_retransmit(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
@@ -281,58 +321,64 @@ static inline int tcp_do_retransmit(TCP *tcp, struct Socket *sk, uint64_t now_ts
             tcp->snd_nxt = snd_nxt;
             ((HTTP *)sk->l5_protocol)->snd_window = 1;
             // net_stats_push_rt();
-            tcp->timer_tsc = current_ts_msec();
+            tcp->timer_tsc = time_in_config();
+            net_stats_push_rt();
             return RETRANSMIT_TIMEOUT;
         }
         else
         {
             tcp_reply(tcp, sk, flags);
         }
-        // if (flags & TH_SYN) {
-        //     net_stats_syn_rt();
-        // } else if (flags & TH_PUSH) {
-        //     net_stats_push_rt();
-        // } else if (flags & TH_FIN) {
-        //     net_stats_fin_rt();
-        // } else {
-        //     net_stats_ack_rt();
-        // }
+        if (flags & TH_SYN) {
+            net_stats_syn_rt();
+        } else if (flags & TH_PUSH) {
+            net_stats_push_rt();
+        } else if (flags & TH_FIN) {
+            net_stats_fin_rt();
+        } else {
+            net_stats_ack_rt();
+        }
         return -1;
     }
     else
     {
         // SOCKET_LOG(sk, "err-socket");
-        // net_stats_socket_error();
+        net_stats_socket_error();
         tcp_socket_close(tcp, sk);
         return -1;
     }
     return -1;
 }
 
-struct RetransmitTimer : public Timer {
+struct RetransmitTimer : public Timer<RetransmitTimer>
+{
     Socket *sk;
     RetransmitTimer(Socket *sk) : sk(sk) {}
+    uint64_t delay_tsc() override
+    {
+        return RETRANSMIT_TIMEOUT * (g_tsc_per_second / 1000);
+    }
     int callback() override
     {
-        TCP* tcp = (TCP*)sk->l4_protocol;
-        return tcp_do_retransmit(tcp, sk, current_ts_msec());
+        TCP *tcp = (TCP *)sk->l4_protocol;
+        return tcp_do_retransmit(tcp, sk, time_in_config()) ;
     }
 };
+template class Timer<RetransmitTimer>;
 
 static inline void tcp_start_retransmit_timer(TCP *tcp, Socket *sk, uint64_t now_tsc)
 {
     if (tcp->snd_nxt != tcp->snd_una)
     {
         tcp->timer_tsc = now_tsc;
-        TIMERS.add_job(new RetransmitTimer(sk), now_tsc + RETRANSMIT_TIMEOUT);
+        TIMERS.add_job(new RetransmitTimer(sk), now_tsc);
     }
 }
 
 static inline void tcp_start_timeout_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
     tcp->timer_tsc = now_tsc;
-    uint64_t timeout_tsc = (RETRANSMIT_TIMEOUT * RETRANSMIT_NUM_MAX) + tcp->keepalive_request_interval;
-    TIMERS.add_job(new TimeoutTimer(sk), now_tsc + timeout_tsc);
+    TIMERS.add_job(new TimeoutTimer(sk), now_tsc);
 }
 
 static inline void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
@@ -340,7 +386,7 @@ static inline void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64
     if (tcp->keepalive && (tcp->snd_nxt == tcp->snd_una))
     {
         tcp->timer_tsc = now_tsc;
-        TIMERS.add_job(new KeepAliveTimer(sk), now_tsc + tcp->keepalive_request_interval);
+        TIMERS.add_job(new KeepAliveTimer(sk), now_tsc);
     }
 }
 
@@ -371,6 +417,20 @@ struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
     struct rte_mbuf *m = NULL;
     uint64_t now_tsc = 0;
 
+    tcp_flags_tx_count(tcp_flags);
+
+    if (tcp_flags & TH_PUSH) {
+        if (TCP::server == 0) {
+            net_stats_tcp_req();
+            net_stats_http_get();
+        } else {
+            if (TCP::send_window == 0) {
+                net_stats_tcp_rsp();
+                net_stats_http_2xx();
+            }
+        }
+    }
+
     m = tcp_new_packet(tcp, sk, tcp_flags);
     if (m)
     {
@@ -384,7 +444,7 @@ struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
             /* for accurate PPS */
             if ((!tcp->server) && (tcp->keepalive != 0))
             {
-                now_tsc = current_ts_msec();
+                now_tsc = time_in_config();
             }
             if (tcp->send_window == 0)
             {
@@ -478,7 +538,7 @@ inline void tcp_reply_rst(TCP *tcp, Socket *sk, struct ether_header *eth, struct
     {
         rte_pktmbuf_trim(m, olen - nlen);
     }
-    // net_stats_rst_tx();
+    net_stats_rst_tx();
     tcp_send_packet(tcp, m, sk);
 }
 static inline uint8_t *tcp_data_get(struct iphdr *iph, struct tcphdr *th, uint16_t *data_len)
@@ -533,7 +593,7 @@ static inline void tcp_reply_more(struct TCP *tcp, struct Socket *sk)
     {
         if (tcp->keepalive)
         {
-            tcp_start_timeout_timer(tcp, sk, current_ts_msec());
+            tcp_start_timeout_timer(tcp, sk, time_in_config());
         }
         else
         {
@@ -621,7 +681,7 @@ static inline bool tcp_check_sequence(struct TCP *tcp, struct Socket *sk, struct
             else if (ack == tcp->snd_una)
             {
                 tcp->retrans++;
-                // net_stats_ack_dup();
+                net_stats_ack_dup();
                 /* 3 ACK means packets loss. */
                 if (tcp->retrans < 3)
                 {
@@ -645,9 +705,9 @@ static inline bool tcp_check_sequence(struct TCP *tcp, struct Socket *sk, struct
         else
         {
             /* fast retransmit : If the last transmission time is more than 1 second */
-            if ((tcp->timer_tsc + MS_PER_SEC) < current_ts_msec())
+            if ((tcp->timer_tsc + TSC_PER_SEC) < time_in_config())
             {
-                tcp_do_retransmit(tcp, sk, current_ts_msec());
+                tcp_do_retransmit(tcp, sk, time_in_config());
             }
         }
     }
@@ -657,7 +717,7 @@ static inline bool tcp_check_sequence(struct TCP *tcp, struct Socket *sk, struct
         if (tcp_seq_le(seq, tcp->rcv_nxt))
         {
             tcp_reply(tcp, sk, TH_ACK);
-            // net_stats_ack_rt();
+            net_stats_ack_rt();
         }
     }
 
@@ -696,7 +756,7 @@ inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rt
     //         // SOCKET_LOG_ENABLE(sk);
     //         // MBUF_LOG(m, "syn-ack-lost");
     //         // SOCKET_LOG(sk, "syn-ack-lost");
-    //         if ((tcp->timer_tsc + MS_PER_SEC) < current_ts_msec())
+    //         if ((tcp->timer_tsc + MS_PER_SEC) < time_in_config())
     //         {
     //             tcp_reply(tcp, sk, TH_SYN | TH_ACK);
     //             // net_stats_syn_rt();
@@ -726,12 +786,12 @@ inline void tcp_client_process_syn_ack(struct TCP *tcp, struct Socket *sk,
             // SOCKET_LOG_ENABLE(sk);
             // MBUF_LOG(m, "drop-syn-ack1");
             // SOCKET_LOG(sk, "drop-syn-ack1");
-            // net_stats_tcp_drop();
+            net_stats_tcp_drop();
             mbuf_free2(m);
             return;
         }
 
-        // net_stats_rtt(ws, sk);
+        net_stats_rtt(tcp);
         tcp->rcv_nxt = seq + 1;
         tcp->snd_una = ack;
         tcp->state = TCP_ESTABLISHED;
@@ -740,11 +800,11 @@ inline void tcp_client_process_syn_ack(struct TCP *tcp, struct Socket *sk,
     else if (tcp->state == TCP_ESTABLISHED)
     {
         /* ack lost */
-        // net_stats_pkt_lost();
+        net_stats_pkt_lost();
         if ((ack == tcp->snd_nxt) && ((seq + 1) == tcp->rcv_nxt))
         {
             tcp_reply(tcp, sk, TH_ACK);
-            // net_stats_ack_rt();
+            net_stats_ack_rt();
         }
     }
     else
@@ -752,7 +812,7 @@ inline void tcp_client_process_syn_ack(struct TCP *tcp, struct Socket *sk,
         // SOCKET_LOG_ENABLE(sk);
         // MBUF_LOG(m, "drop-syn-ack2");
         // SOCKET_LOG(sk, "drop-syn-ack-bad2");
-        // net_stats_tcp_drop();
+        net_stats_tcp_drop();
     }
 
     mbuf_free2(m);
@@ -827,7 +887,7 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
         // SOCKET_LOG_ENABLE(sk);
         MBUF_LOG(m, "drop-bad-seq");
         // SOCKET_LOG(sk, "drop-bad-seq");
-        // net_stats_tcp_drop();
+        net_stats_tcp_drop();
         mbuf_free2(m);
         return;
     }
@@ -845,8 +905,8 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
             if ((TCP::send_window) && ((rx_flags & TH_FIN) == 0))
             {
                 socket_init_http_server((HTTP *)sk->l5_protocol, tcp);
-                // net_stats_tcp_rsp();
-                // net_stats_http_2xx();
+                net_stats_tcp_rsp();
+                net_stats_http_2xx();
                 if (tcp->keepalive_request_num)
                 {
                     tcp_reply_more(tcp, sk);
@@ -857,7 +917,7 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
                     tcp_reply(tcp, sk, TH_PUSH | TH_ACK);
                     tcp->keepalive_request_num = 1;
                 }
-                tcp_start_retransmit_timer(tcp, sk, current_ts_msec());
+                tcp_start_retransmit_timer(tcp, sk, time_in_config());
                 mbuf_free2(m);
                 return;
             }
@@ -889,7 +949,7 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
     }
     else if (tcp->state != TCP_CLOSE)
     {
-        tcp_start_timeout_timer(tcp, sk, current_ts_msec());
+        tcp_start_timeout_timer(tcp, sk, time_in_config());
     }
 
     mbuf_free2(m);
@@ -916,7 +976,7 @@ inline void tcp_server_process(TCP *tcp, Socket *sk, ether_header *eth_hdr, iphd
     {
         // MBUF_LOG(m, "drop-bad-flags");
         // SOCKET_LOG(sk, "drop-bad-flags");
-        // net_stats_tcp_drop();
+        net_stats_tcp_drop();
         mbuf_free2(data);
     }
 }
@@ -935,7 +995,7 @@ static inline void tcp_client_process_data(struct TCP *tcp, struct Socket *sk, s
         // SOCKET_LOG_ENABLE(sk);
         // MBUF_LOG(m, "drop-bad-seq");
         // SOCKET_LOG(sk, "drop-bad-seq");
-        // net_stats_tcp_drop();
+        net_stats_tcp_drop();
         mbuf_free2(m);
         return;
     }
@@ -1012,7 +1072,7 @@ inline void tcp_client_process(TCP *tcp, Socket *sk, ether_header *eth_hdr, iphd
         // SOCKET_LOG_ENABLE(sk);
         // MBUF_LOG(m, "drop-bad-flags");
         // SOCKET_LOG(sk, "drop-bad-flags");
-        // net_stats_tcp_drop();
+        net_stats_tcp_drop();
         mbuf_free2(data);
     }
 }
@@ -1054,13 +1114,17 @@ int TCP::process(Socket *sk, rte_mbuf *data)
 Socket *tcp_new_socket(const Socket *template_socket)
 {
     Socket *socket = new Socket(*template_socket);
-    socket->l4_protocol = new TCP(*(TCP *)template_socket->l4_protocol);
+    TCP* tcp = new TCP(*(TCP *)template_socket->l4_protocol);
+    tcp->timer_tsc = time_in_config();
+    socket->l4_protocol = tcp;
     socket->l5_protocol = new HTTP(*(HTTP *)template_socket->l5_protocol);
+    net_stats_socket_open();
     return socket;
 }
 
 void tcp_release_socket(Socket *socket)
 {
+    net_stats_socket_close();
     delete (TCP *)socket->l4_protocol;
     delete (HTTP *)socket->l5_protocol;
     delete socket;

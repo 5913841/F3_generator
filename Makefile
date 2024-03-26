@@ -1,6 +1,6 @@
 
 APP=THUGEN
-SRCS-y := examples/http_flood/main.cpp src/common/*.cpp src/dpdk/*.cpp src/dpdk/*.c src/multi_thread/*.cpp src/protocols/*.cpp src/socket/*.cpp src/timer/*.cpp \
+SRCS-y := examples/http_flood/main.cpp src/timer/*.cpp src/common/*.cpp src/dpdk/*.cpp src/multi_thread/*.cpp src/protocols/*.cpp src/socket/*.cpp src/panel/*.cpp \
  			# src/socket/socket_table/*.cpp src/socket/socket_vector/*.cpp src/socket/socket_tree/*.cpp
 
 #dpdk 17.11, 18.11, 19.11

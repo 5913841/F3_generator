@@ -56,12 +56,12 @@ public:
     uint16_t log : 1;
     uint16_t keepalive_request_num : 15;
     uint64_t timer_tsc;
-    uint16_t csum_tcp;
-    uint16_t csum_tcp_opt;
-    uint16_t csum_tcp_data;
-    uint16_t csum_ip;
-    uint16_t csum_ip_opt;
-    uint16_t csum_ip_data;
+    // uint16_t csum_tcp;
+    // uint16_t csum_tcp_opt;
+    // uint16_t csum_tcp_data;
+    // uint16_t csum_ip;
+    // uint16_t csum_ip_opt;
+    // uint16_t csum_ip_data;
 
     static bool flood;
     static bool server;

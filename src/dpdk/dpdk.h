@@ -3,5 +3,4 @@
 
 int dpdk_init(struct dpdk_config *cfg, char *argv0);
 
-
 #endif

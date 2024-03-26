@@ -7,6 +7,7 @@
 #include <rte_ether.h>
 #include <netinet/ether.h>
 #include "dpdk/port.h"
+#include "dpdk/dpdk_config.h"
 #include "common/utils.h"
 #include "common/packets.h"
 
@@ -21,30 +22,36 @@ static inline void eth_addr_swap(struct ether_header *eth)
 
 class ETHER;
 
-extern ETHER* parser_eth;
+extern ETHER *parser_eth;
 
-class ETHER : public L2_Protocol {
+class ETHER : public L2_Protocol
+{
 public:
-    netif_port* port;
-    int queue_id;
-    tx_queue* tq;
+    netif_port *port;
     ETHER() : L2_Protocol(ProtocolCode::PTC_ETH), port(nullptr) {}
-    ETHER(netif_port* port) : L2_Protocol(ProtocolCode::PTC_ETH), port(port) {}
-    static inline ether_header* decode_hdr_pre(rte_mbuf* data) {
-        return rte_pktmbuf_mtod_offset(data, struct ether_header*, -sizeof(struct ether_header));
+    ETHER(netif_port *port) : L2_Protocol(ProtocolCode::PTC_ETH), port(port) {}
+    static inline ether_header *decode_hdr_pre(rte_mbuf *data)
+    {
+        return rte_pktmbuf_mtod_offset(data, struct ether_header *, -sizeof(struct ether_header));
     }
-    static inline ether_header* decode_hdr(rte_mbuf* data) {
-        return rte_pktmbuf_mtod_offset(data, struct ether_header*, 0);
+    static inline ether_header *decode_hdr(rte_mbuf *data)
+    {
+        return rte_pktmbuf_mtod_offset(data, struct ether_header *, 0);
     }
-    size_t get_hdr_len(Socket* socket, rte_mbuf* data) override {
+    size_t get_hdr_len(Socket *socket, rte_mbuf *data) override
+    {
         return sizeof(struct ether_header);
     }
-    int construct(Socket* socket, rte_mbuf* data) override {
-        ether_header* eth = decode_hdr_pre(data);
+    int construct(Socket *socket, rte_mbuf *data) override
+    {
+        ether_header *eth = decode_hdr_pre(data);
 
-        if(socket->l3_protocol->name == ProtocolCode::PTC_IPV4){
+        if (socket->l3_protocol->name == ProtocolCode::PTC_IPV4)
+        {
             eth->ether_type = htons(RTE_ETHER_TYPE_IPV4);
-        }else if(socket->l3_protocol->name == ProtocolCode::PTC_IPV6){
+        }
+        else if (socket->l3_protocol->name == ProtocolCode::PTC_IPV6)
+        {
             eth->ether_type = htons(RTE_ETHER_TYPE_IPV6);
         }
 
@@ -56,19 +63,22 @@ public:
 
         return sizeof(struct ether_header);
     }
-    int send_frame(Socket* socket, rte_mbuf* data) override {
+    int send_frame(Socket *socket, rte_mbuf *data) override
+    {
         construct(socket, data);
 
-        send_packet_by_queue(tq, data, port->id, queue_id);
+        dpdk_config_percore::cfg_send_packet(data);
         return sizeof(struct ether_header);
     }
 
-    static int parse_packet_ft(rte_mbuf* data, FiveTuples* ft, int offset) {
+    static int parse_packet_ft(rte_mbuf *data, FiveTuples *ft, int offset)
+    {
         ft->protocol_codes[SOCKET_L2] = ProtocolCode::PTC_ETH;
         return sizeof(struct ether_header);
     }
 
-    static int parse_packet_sk(rte_mbuf* data, Socket* sk, int offset) {
+    static int parse_packet_sk(rte_mbuf *data, Socket *sk, int offset)
+    {
         sk->l2_protocol = parser_eth;
         return sizeof(struct ether_header);
     }

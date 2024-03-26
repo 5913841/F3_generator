@@ -10,7 +10,8 @@
 #include "netinet/in.h"
 #include "socket/socket.h"
 
-struct netif_port {
+struct netif_port
+{
     int id; /* DPDK port id */
     int queue_num;
     int socket; /* cpu socket */
@@ -31,15 +32,15 @@ struct netif_port {
     uint8_t pci_num;
     char bond_name[BOND_NAME_MAX];
 
-    union {
+    union
+    {
         char pci[PCI_LEN + 1];
         char pci_list[PCI_NUM_MAX][PCI_LEN + 1];
     };
 
     uint16_t port_id_list[PCI_NUM_MAX];
-    netif_port(): id(-1), queue_num(-1), socket(-1), enable(false), gateway_ipv6(false), gateway_ip(0), gateway_mac(), local_mac(), kni(NULL), vxlan(NULL), bond(false), bond_mode(0), bond_policy(0), pci_num(1), bond_name(), pci(), port_id_list() {};
+    netif_port() : id(-1), queue_num(-1), socket(-1), enable(false), gateway_ipv6(false), gateway_ip(0), gateway_mac(), local_mac(), kni(NULL), vxlan(NULL), bond(false), bond_mode(0), bond_policy(0), pci_num(1), bond_name(), pci(), port_id_list(){};
 };
-
 
 extern uint8_t g_dev_tx_offload_ipv4_cksum;
 extern uint8_t g_dev_tx_offload_tcpudp_cksum;
