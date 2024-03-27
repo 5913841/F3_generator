@@ -6,7 +6,7 @@
 
 #define HTTP_REQ_FORMAT     \
     "GET %s HTTP/1.1\r\n"   \
-    "User-Agent: dperf\r\n" \
+    "User-Agent: THUGEN\r\n" \
     "Host: %s\r\n"          \
     "Accept: */*\r\n"       \
     "P: aa\r\n"             \
@@ -22,7 +22,7 @@
 
 static char http_rsp[MBUF_DATA_SIZE];
 static char http_req[MBUF_DATA_SIZE];
-static const char *http_rsp_body_default = "hello dperf!\r\n";
+static const char *http_rsp_body_default = "hello THUGEN!\r\n";
 
 HTTP *parser_http = new HTTP();
 

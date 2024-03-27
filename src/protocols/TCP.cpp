@@ -214,7 +214,7 @@ static inline void tcp_send_keepalive_request(TCP *tcp, struct Socket *sk)
     {
         tcp->keepalive_request_num++;
         tcp_reply(tcp, sk, TH_ACK | TH_PUSH);
-        if (unlikely((tcp->keepalive_request_num > 0) && (tcp->keepalive_request_num >= tcp->keepalive_request_num)))
+        if (unlikely((tcp->keepalive_request_num > 0) && (tcp->keepalive_request_num >= tcp->setted_keepalive_request_num)))
         {
             tcp->keepalive = 0;
         }

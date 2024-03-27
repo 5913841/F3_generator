@@ -140,11 +140,11 @@ SpecificTimers::SpecificTimers(TimerBase *hd)
 
 void SpecificTimers::trigger()
 {
-    uint64_t cur_ts = current_ts_msec();
+    uint64_t cur_ts = time_in_config();
     while (head != tail)
     {
         auto timer = head->next;
-        if (timer->begin_tsc + delay_tsc > cur_ts)
+        if (timer == nullptr || timer->begin_tsc + delay_tsc > cur_ts)
         {
             break;
         }
