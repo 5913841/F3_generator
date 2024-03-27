@@ -732,42 +732,42 @@ inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rt
         tcp->state = TCP_CLOSE;
     }
 
-    //     if (tcp->state == TCP_CLOSE || tcp->state == TCP_LISTEN)
-    //     {
-    //         // socket_server_open(&ws->socket_table, sk, th);
-    //         if (tcp->state != TCP_SYN_RECV)
-    //         {
-    //             tcp->state = TCP_SYN_RECV;
-    //         }
-    // #ifdef DPERF_DEBUG
-    //         tcp->log = 0;
-    // #endif
-    //         tcp->retrans = 0;
-    //         tcp->keepalive_request_num = 0;
-    //         tcp->snd_nxt++;
-    //         tcp->snd_una = tcp->snd_nxt;
-    //         ((HTTP*)(sk->l5_protocol))->snd_window = 1;
-    //         tcp->rcv_nxt = ntohl(th->th_seq) + 1;
-    //         tcp_reply(tcp, sk, TH_SYN | TH_ACK);
-    //     }
-    //     else if (tcp->state == TCP_SYN_RECV)
-    //     {
-    //         /* syn-ack lost, resend it */
-    //         // SOCKET_LOG_ENABLE(sk);
-    //         // MBUF_LOG(m, "syn-ack-lost");
-    //         // SOCKET_LOG(sk, "syn-ack-lost");
-    //         if ((tcp->timer_tsc + MS_PER_SEC) < time_in_config())
-    //         {
-    //             tcp_reply(tcp, sk, TH_SYN | TH_ACK);
-    //             // net_stats_syn_rt();
-    //         }
-    //     }
+    if (tcp->state == TCP_CLOSE || tcp->state == TCP_LISTEN)
+    {
+        // socket_server_open(&ws->socket_table, sk, th);
+        if (tcp->state != TCP_SYN_RECV)
+        {
+            tcp->state = TCP_SYN_RECV;
+        }
+#ifdef DPERF_DEBUG
+        tcp->log = 0;
+#endif
+        tcp->retrans = 0;
+        tcp->keepalive_request_num = 0;
+        tcp->snd_nxt++;
+        tcp->snd_una = tcp->snd_nxt;
+        ((HTTP*)(sk->l5_protocol))->snd_window = 1;
+        tcp->rcv_nxt = ntohl(th->th_seq) + 1;
+        tcp_reply(tcp, sk, TH_SYN | TH_ACK);
+    }
+    else if (tcp->state == TCP_SYN_RECV)
+    {
+        /* syn-ack lost, resend it */
+        // SOCKET_LOG_ENABLE(sk);
+        // MBUF_LOG(m, "syn-ack-lost");
+        // SOCKET_LOG(sk, "syn-ack-lost");
+        if ((tcp->timer_tsc + MS_PER_SEC) < time_in_config())
+        {
+            tcp_reply(tcp, sk, TH_SYN | TH_ACK);
+            net_stats_syn_rt();
+        }
+    }
     else
     {
         // SOCKET_LOG_ENABLE(sk);
         // MBUF_LOG(m, "drop-syn");
         // SOCKET_LOG(sk, "drop-bad-syn");
-        // net_stats_tcp_drop();
+        net_stats_tcp_drop();
     }
 
     mbuf_free2(m);

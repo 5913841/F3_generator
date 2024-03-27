@@ -1,7 +1,13 @@
-
-APP=THUGEN
-SRCS-y := examples/http_flood/main.cpp src/timer/*.cpp src/common/*.cpp src/dpdk/*.cpp src/multi_thread/*.cpp src/protocols/*.cpp src/socket/*.cpp src/panel/*.cpp \
+APP := THUGEN
+EXAMPLES := examples/http_flood/client_main.cpp examples/http_flood/server_main.cpp
+SRCS-y := src/timer/*.cpp src/common/*.cpp src/dpdk/*.cpp src/multi_thread/*.cpp src/protocols/*.cpp src/socket/*.cpp src/panel/*.cpp \
  			# src/socket/socket_table/*.cpp src/socket/socket_vector/*.cpp src/socket/socket_tree/*.cpp
+EX_TO_NA = $(subst examples/,build/,$(subst .cpp,,$1))
+NA_TO_EX = $(subst build/,examples/,$1).cpp
+NAMES := $(foreach file,$(EXAMPLES),$(call EX_TO_NA,$(file)))
+
+
+.PHONY: all clean 
 
 #dpdk 17.11, 18.11, 19.11
 ifdef RTE_SDK
@@ -38,12 +44,18 @@ CFLAGS += -Wno-address-of-packed-member -Wformat-truncation=0
 CFLAGS += $(shell $(PKGCONF) --cflags libdpdk)
 LDFLAGS += $(shell $(PKGCONF) --libs libdpdk) -lpthread -lrte_net_bond -lrte_bus_pci -lrte_bus_vdev -lrte_pcapng -lrte_pdump -lrte_efd -lpcap -lstdc++
 
-build/$(APP): $(SRCS-y)
-	mkdir -p build
-	g++ $(CFLAGS) $(SRCS-y) -o $@ $(LDFLAGS)
 
-build/dumpcap:dumpcap/main.c
-	gcc $(CFLAGS) dumpcap/main.c -o build/dumpcap $(LDFLAGS)
+all: build $(NAMES)
+
+build::
+	mkdir -p build
+
+build/%: examples/%.cpp $(SRCS-y)
+	mkdir -p $(dir $@)
+	g++ $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# build/dumpcap:dumpcap/main.c
+# 	gcc $(CFLAGS) dumpcap/main.c -o build/dumpcap $(LDFLAGS)
 
 clean:
 	rm -rf build/

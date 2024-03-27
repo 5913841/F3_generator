@@ -2,7 +2,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
-#include <dpdk/rte_cycles.h>
+#include <rte_cycles.h>
 #include <string.h>
 #include "dpdk/dpdk_config.h"
 
