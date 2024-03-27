@@ -94,7 +94,7 @@ void config_tcp_variables()
 void config_http_variables()
 {
     HTTP::parser_init();
-    HTTP::payload_size = 64;
+    HTTP::payload_size = 100;
     HTTP::payload_random = false;
     strcpy(HTTP::http_host, HTTP_HOST_DEFAULT);
     strcpy(HTTP::http_path, HTTP_PATH_DEFAULT);

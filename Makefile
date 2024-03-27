@@ -54,8 +54,8 @@ build/%: examples/%.cpp $(SRCS-y)
 	mkdir -p $(dir $@)
 	g++ $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
-# build/dumpcap:dumpcap/main.c
-# 	gcc $(CFLAGS) dumpcap/main.c -o build/dumpcap $(LDFLAGS)
+build/dumpcap:dumpcap/main.c
+	gcc $(CFLAGS) dumpcap/main.c -o build/dumpcap $(LDFLAGS)
 
 clean:
 	rm -rf build/
