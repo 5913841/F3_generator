@@ -73,6 +73,8 @@ void config_tcp_variables()
     TCP::setted_keepalive_request_num = 0; // client
     TCP::release_socket_callback = [](Socket *sk)
     { socket_table->remove_socket(sk); tcp_release_socket(sk); };
+    TCP::create_socket_callback = [](Socket *sk)
+    { socket_table->insert_socket(sk); };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;
@@ -140,13 +142,16 @@ int start_test(__rte_unused void *arg1)
         {
             Socket *parser_socket = new Socket();
             parse_packet(m, parser_socket);
-            Socket *socket = tcp_new_socket(template_socket);
-            socket->dst_addr = parser_socket->dst_addr;
-            socket->src_addr = parser_socket->src_addr;
-            socket->src_port = parser_socket->src_port;
-            socket->dst_port = parser_socket->dst_port;
-            socket_table->insert_socket(socket);
-            if (socket != nullptr) socket->l4_protocol->process(socket, m);
+            Socket *socket = socket_table->find_socket(parser_socket);
+            if(socket == nullptr)
+            {
+                socket = tcp_new_socket(template_socket);
+                socket->dst_addr = parser_socket->dst_addr;
+                socket->src_addr = parser_socket->src_addr;
+                socket->src_port = parser_socket->src_port;
+                socket->dst_port = parser_socket->dst_port;
+            }
+            socket->l4_protocol->process(socket, m);
         }
 
         dpdk_config_percore::cfg_send_flush();

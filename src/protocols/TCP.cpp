@@ -19,6 +19,7 @@ bool TCP::global_stop;
 uint64_t TCP::keepalive_request_interval;
 int TCP::setted_keepalive_request_num;
 std::function<void(Socket *sk)> TCP::release_socket_callback;
+std::function<void(Socket *sk)> TCP::create_socket_callback;
 bool TCP::global_tcp_rst;
 uint8_t TCP::tos;
 bool TCP::use_http;
@@ -46,33 +47,56 @@ bool tcp_seq_ge(uint32_t a, uint32_t b)
     return (a - b) < 0x80000000;
 }
 
+bool tcp_state_before_established(uint8_t state)
+{
+    return state == TCP_CLOSE ||
+           state == TCP_LISTEN ||
+           state == TCP_SYN_SENT ||
+           state == TCP_SYN_RECV;
+}
+
+bool tcp_state_after_established(uint8_t state)
+{
+    return state == TCP_FIN_WAIT1 ||
+           state == TCP_FIN_WAIT2 ||
+           state == TCP_CLOSING ||
+           state == TCP_CLOSE_WAIT ||
+           state == TCP_LAST_ACK ||
+           state == TCP_TIME_WAIT;
+}
 
 static inline void tcp_flags_rx_count(uint8_t tcp_flags)
 {
-    if (tcp_flags & TH_SYN) {
+    if (tcp_flags & TH_SYN)
+    {
         net_stats_syn_rx();
     }
 
-    if (tcp_flags & TH_FIN) {
+    if (tcp_flags & TH_FIN)
+    {
         net_stats_fin_rx();
     }
 
-    if (tcp_flags & TH_RST) {
+    if (tcp_flags & TH_RST)
+    {
         net_stats_rst_rx();
     }
 }
 
 static inline void tcp_flags_tx_count(uint8_t tcp_flags)
 {
-    if (tcp_flags & TH_SYN) {
+    if (tcp_flags & TH_SYN)
+    {
         net_stats_syn_tx();
     }
 
-    if (tcp_flags & TH_FIN) {
+    if (tcp_flags & TH_FIN)
+    {
         net_stats_fin_tx();
     }
 
-    if (tcp_flags & TH_RST) {
+    if (tcp_flags & TH_RST)
+    {
         net_stats_rst_tx();
     }
 }
@@ -151,7 +175,7 @@ static void tcp_socket_close(TCP *tcp, struct Socket *sk)
         tcp->state = TCP_CLOSE;
         /* don't clear sequences in TIME-WAIT */
         tcp->release_socket_callback(sk);
-        // net_stats_socket_close();
+        net_stats_socket_close();
     }
 }
 
@@ -329,13 +353,20 @@ static inline int tcp_do_retransmit(TCP *tcp, struct Socket *sk, uint64_t now_ts
         {
             tcp_reply(tcp, sk, flags);
         }
-        if (flags & TH_SYN) {
+        if (flags & TH_SYN)
+        {
             net_stats_syn_rt();
-        } else if (flags & TH_PUSH) {
+        }
+        else if (flags & TH_PUSH)
+        {
             net_stats_push_rt();
-        } else if (flags & TH_FIN) {
+        }
+        else if (flags & TH_FIN)
+        {
             net_stats_fin_rt();
-        } else {
+        }
+        else
+        {
             net_stats_ack_rt();
         }
         return -1;
@@ -361,7 +392,7 @@ struct RetransmitTimer : public Timer<RetransmitTimer>
     int callback() override
     {
         TCP *tcp = (TCP *)sk->l4_protocol;
-        return tcp_do_retransmit(tcp, sk, time_in_config()) ;
+        return tcp_do_retransmit(tcp, sk, time_in_config());
     }
 };
 template class Timer<RetransmitTimer>;
@@ -419,12 +450,17 @@ struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
 
     tcp_flags_tx_count(tcp_flags);
 
-    if (tcp_flags & TH_PUSH) {
-        if (TCP::server == 0) {
+    if (tcp_flags & TH_PUSH)
+    {
+        if (TCP::server == 0)
+        {
             net_stats_tcp_req();
             net_stats_http_get();
-        } else {
-            if (TCP::send_window == 0) {
+        }
+        else
+        {
+            if (TCP::send_window == 0)
+            {
                 net_stats_tcp_rsp();
                 net_stats_http_2xx();
             }
@@ -734,11 +770,9 @@ inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rt
 
     if (tcp->state == TCP_CLOSE || tcp->state == TCP_LISTEN)
     {
-        // socket_server_open(&ws->socket_table, sk, th);
-        if (tcp->state != TCP_SYN_RECV)
-        {
-            tcp->state = TCP_SYN_RECV;
-        }
+        tcp->create_socket_callback(sk);
+        net_stats_socket_open();
+        tcp->state = TCP_SYN_RECV;
 #ifdef DPERF_DEBUG
         tcp->log = 0;
 #endif
@@ -746,7 +780,7 @@ inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rt
         tcp->keepalive_request_num = 0;
         tcp->snd_nxt++;
         tcp->snd_una = tcp->snd_nxt;
-        ((HTTP*)(sk->l5_protocol))->snd_window = 1;
+        ((HTTP *)(sk->l5_protocol))->snd_window = 1;
         tcp->rcv_nxt = ntohl(th->th_seq) + 1;
         tcp_reply(tcp, sk, TH_SYN | TH_ACK);
     }
@@ -767,6 +801,7 @@ inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rt
         // SOCKET_LOG_ENABLE(sk);
         // MBUF_LOG(m, "drop-syn");
         // SOCKET_LOG(sk, "drop-bad-syn");
+        tcp_release_socket(sk);
         net_stats_tcp_drop();
     }
 
@@ -892,7 +927,7 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
         return;
     }
 
-    if (tcp->state < TCP_ESTABLISHED)
+    if (tcp_state_before_established(tcp->state))
     {
         tcp->state = TCP_ESTABLISHED;
     }
@@ -938,7 +973,7 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
         }
     }
 
-    if ((tcp->state > TCP_ESTABLISHED) || ((rx_flags | tx_flags) & TH_FIN))
+    if (tcp_state_after_established(tcp->state) || ((rx_flags | tx_flags) & TH_FIN))
     {
         tx_flags = tcp_process_fin(tcp, sk, rx_flags, tx_flags);
     }
@@ -959,6 +994,7 @@ inline void tcp_server_process(TCP *tcp, Socket *sk, ether_header *eth_hdr, iphd
 {
 
     uint8_t flags = tcp_hdr->th_flags;
+    tcp_flags_rx_count(flags);
 
     if (((flags & (TH_SYN | TH_RST)) == 0) && (flags & TH_ACK))
     {
@@ -1033,7 +1069,7 @@ static inline void tcp_client_process_data(struct TCP *tcp, struct Socket *sk, s
         }
     }
 
-    if ((tcp->state > TCP_ESTABLISHED) || ((rx_flags | tx_flags) & TH_FIN))
+    if (tcp_state_after_established(tcp->state) || ((rx_flags | tx_flags) & TH_FIN))
     {
         tx_flags = tcp_process_fin(tcp, sk, rx_flags, tx_flags);
     }
@@ -1114,17 +1150,15 @@ int TCP::process(Socket *sk, rte_mbuf *data)
 Socket *tcp_new_socket(const Socket *template_socket)
 {
     Socket *socket = new Socket(*template_socket);
-    TCP* tcp = new TCP(*(TCP *)template_socket->l4_protocol);
+    TCP *tcp = new TCP(*(TCP *)template_socket->l4_protocol);
     tcp->timer_tsc = time_in_config();
     socket->l4_protocol = tcp;
     socket->l5_protocol = new HTTP(*(HTTP *)template_socket->l5_protocol);
-    net_stats_socket_open();
     return socket;
 }
 
 void tcp_release_socket(Socket *socket)
 {
-    net_stats_socket_close();
     delete (TCP *)socket->l4_protocol;
     delete (HTTP *)socket->l5_protocol;
     delete socket;
@@ -1135,4 +1169,5 @@ void tcp_launch(Socket *socket)
     TCP *tcp = (TCP *)socket->l4_protocol;
     tcp_reply(tcp, socket, TH_SYN);
     tcp->state = TCP_SYN_SENT;
+    net_stats_socket_open();
 }

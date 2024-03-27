@@ -15,20 +15,6 @@ bool tcp_seq_ge(uint32_t a, uint32_t b);
 
 typedef uint8_t TCP_STATE;
 
-// enum TCP_STATE {
-//     TCP_CLOSED,
-//     TCP_LISTEN,
-//     TCP_SYN_SENT,
-//     TCP_SYN_RECEIVED,
-//     TCP_ESTABLISHED,
-//     TCP_FIN_WAIT_1,
-//     TCP_FIN_WAIT_2,
-//     TCP_CLOSE_WAIT,
-//     TCP_CLOSING,
-//     TCP_LAST_ACK,
-//     TCP_TIME_WAIT
-// };
-
 struct tcp_opt_mss
 {
     uint8_t kind;
@@ -76,6 +62,7 @@ public:
     static uint64_t keepalive_request_interval;
     static int setted_keepalive_request_num;
     static std::function<void(Socket *sk)> release_socket_callback;
+    static std::function<void(Socket *sk)> create_socket_callback;
     static bool global_tcp_rst;
     static uint8_t tos;
     static bool use_http;
