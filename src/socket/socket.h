@@ -120,10 +120,16 @@ public:
         memset(protocols, 0, sizeof(protocols));
     }
 
-    // Socket(FiveTuples five_tuples_, ProtocolStack protocol_stack_) {
-    //     four_tuples = five_tuples_.four_tuples;
-    //     protocol_stack = protocol_stack_;
-    // }
+    Socket(FiveTuples five_tuples) {
+        src_addr = five_tuples.src_addr;
+        dst_addr = five_tuples.dst_addr;
+        src_port = five_tuples.src_port;
+        dst_port = five_tuples.dst_port;
+        protocols[0] = new NamedProtocol(five_tuples.protocol_codes[0]);
+        protocols[1] = new NamedProtocol(five_tuples.protocol_codes[1]);
+        protocols[2] = new NamedProtocol(five_tuples.protocol_codes[2]);
+        protocols[3] = new NamedProtocol(five_tuples.protocol_codes[3]);
+    }
 
     void set_protocol(int layer, Protocol *protocol)
     {
@@ -131,6 +137,19 @@ public:
     }
 
     static size_t hash(const Socket &socket);
+
+    static void delete_ft_created_socket(Socket* sk)
+    {
+        for(int i = 0; i < 4; i++)
+        {
+            if(sk->protocols[i] != nullptr)
+            {
+                delete sk->protocols[i];
+                sk->protocols[i] = nullptr;
+            }
+        }
+        delete sk;
+    }
 };
 
 struct SocketPointerEqual
@@ -141,10 +160,10 @@ struct SocketPointerEqual
                s1->dst_addr == s2->dst_addr &&
                s1->src_port == s2->src_port &&
                s1->dst_port == s2->dst_port &&
-               s1->l2_protocol->name == s2->l2_protocol->name &&
-               s1->l3_protocol->name == s2->l3_protocol->name &&
-               s1->l4_protocol->name == s2->l4_protocol->name &&
-               s1->l5_protocol->name == s2->l5_protocol->name;
+               s1->l2_protocol->name() == s2->l2_protocol->name() &&
+               s1->l3_protocol->name() == s2->l3_protocol->name() &&
+               s1->l4_protocol->name() == s2->l4_protocol->name() &&
+               s1->l5_protocol->name() == s2->l5_protocol->name();
     }
 };
 

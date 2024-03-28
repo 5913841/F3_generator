@@ -59,7 +59,8 @@ public:
     } ack_delay;
     // #endif
     HTTP_STATE state;
-    HTTP() : L5_Protocol(ProtocolCode::PTC_HTTP) {}
+    HTTP() : L5_Protocol() {}
+    ProtocolCode name() override { return ProtocolCode::PTC_HTTP; }
     inline size_t get_hdr_len(Socket *socket, rte_mbuf *data)
     {
         return 0;

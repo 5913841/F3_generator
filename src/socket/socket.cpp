@@ -50,7 +50,7 @@ FiveTuples::FiveTuples(const Socket &socket)
     dst_port = socket.dst_port;
     for (int i = 0; i < 4; i++)
     {
-        protocol_codes[i] = socket.protocols + i == nullptr ? ProtocolCode::PTC_NONE : socket.protocols[i]->name;
+        protocol_codes[i] = socket.protocols + i == nullptr ? ProtocolCode::PTC_NONE : socket.protocols[i]->name();
     }
 }
 
@@ -89,7 +89,7 @@ size_t Socket::hash(const Socket &sk)
     hash_value += std::hash<uint16_t>()(sk.dst_port);
     for (int i = 0; i < 4; i++)
     {
-        hash_value += std::hash<uint8_t>()(sk.protocols[i]->name);
+        hash_value += std::hash<uint8_t>()(sk.protocols[i]->name());
     }
     return hash_value;
 }

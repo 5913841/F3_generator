@@ -20,6 +20,7 @@ uint64_t TCP::keepalive_request_interval;
 int TCP::setted_keepalive_request_num;
 std::function<void(Socket *sk)> TCP::release_socket_callback;
 std::function<void(Socket *sk)> TCP::create_socket_callback;
+std::function<bool(FiveTuples sk)> TCP::checkvalid_socket_callback;
 bool TCP::global_tcp_rst;
 uint8_t TCP::tos;
 bool TCP::use_http;
@@ -269,18 +270,22 @@ static inline int tcp_do_keepalive(TCP *tcp, struct Socket *sk, uint64_t now_tsc
 struct KeepAliveTimer : public Timer<KeepAliveTimer>
 {
     Socket *sk;
-    KeepAliveTimer(Socket *sk) : sk(sk) {}
+    FiveTuples ft;
+    KeepAliveTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc) {if(sk) ft = *sk;}
     uint64_t delay_tsc() override
     {
         return TCP::keepalive_request_interval * (g_tsc_per_second / 1000);
     }
     int callback() override
     {
+        if(!TCP::checkvalid_socket_callback(ft))
+        {
+            return -1;
+        }
         TCP *tcp = (TCP *)sk->l4_protocol;
         return tcp_do_keepalive(tcp, sk, time_in_config());
     }
 };
-template class Timer<KeepAliveTimer>;
 
 static inline int tcp_do_timeout(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
@@ -295,18 +300,22 @@ static inline int tcp_do_timeout(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 struct TimeoutTimer : public Timer<TimeoutTimer>
 {
     Socket *sk;
-    TimeoutTimer(Socket *sk) : sk(sk) {}
+    FiveTuples ft;
+    TimeoutTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc) {if(sk) ft = *sk;}
     uint64_t delay_tsc() override
     {
         return ((RETRANSMIT_TIMEOUT * RETRANSMIT_NUM_MAX) + TCP::keepalive_request_interval) * (g_tsc_per_second / 1000);
     }
     int callback() override
     {
+        if(!TCP::checkvalid_socket_callback(ft))
+        {
+            return -1;
+        }
         TCP *tcp = (TCP *)sk->l4_protocol;
         return tcp_do_timeout(tcp, sk, time_in_config());
     }
 };
-template class Timer<TimeoutTimer>;
 
 static inline int tcp_do_retransmit(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
@@ -384,32 +393,36 @@ static inline int tcp_do_retransmit(TCP *tcp, struct Socket *sk, uint64_t now_ts
 struct RetransmitTimer : public Timer<RetransmitTimer>
 {
     Socket *sk;
-    RetransmitTimer(Socket *sk) : sk(sk) {}
+    FiveTuples ft;
+    RetransmitTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc) {if(sk) ft = *sk;}
     uint64_t delay_tsc() override
     {
         return RETRANSMIT_TIMEOUT * (g_tsc_per_second / 1000);
     }
     int callback() override
     {
+        if(!TCP::checkvalid_socket_callback(ft))
+        {
+            return -1;
+        }
         TCP *tcp = (TCP *)sk->l4_protocol;
         return tcp_do_retransmit(tcp, sk, time_in_config());
     }
 };
-template class Timer<RetransmitTimer>;
 
 static inline void tcp_start_retransmit_timer(TCP *tcp, Socket *sk, uint64_t now_tsc)
 {
     if (tcp->snd_nxt != tcp->snd_una)
     {
         tcp->timer_tsc = now_tsc;
-        TIMERS.add_job(new RetransmitTimer(sk), now_tsc);
+        TIMERS.add_job(new RetransmitTimer(sk, now_tsc), now_tsc);
     }
 }
 
 static inline void tcp_start_timeout_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
     tcp->timer_tsc = now_tsc;
-    TIMERS.add_job(new TimeoutTimer(sk), now_tsc);
+    TIMERS.add_job(new TimeoutTimer(sk, now_tsc), now_tsc);
 }
 
 static inline void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
@@ -417,15 +430,15 @@ static inline void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64
     if (tcp->keepalive && (tcp->snd_nxt == tcp->snd_una))
     {
         tcp->timer_tsc = now_tsc;
-        TIMERS.add_job(new KeepAliveTimer(sk), now_tsc);
+        TIMERS.add_job(new KeepAliveTimer(sk, now_tsc), now_tsc);
     }
 }
 
 void TCP::timer_init()
 {
-    TIMERS.add_timers(SpecificTimers(new KeepAliveTimer(NULL)));
-    TIMERS.add_timers(SpecificTimers(new RetransmitTimer(NULL)));
-    TIMERS.add_timers(SpecificTimers(new TimeoutTimer(NULL)));
+    TIMERS.add_timers(SpecificTimers(new KeepAliveTimer(NULL, 0)));
+    TIMERS.add_timers(SpecificTimers(new RetransmitTimer(NULL, 0)));
+    TIMERS.add_timers(SpecificTimers(new TimeoutTimer(NULL, 0)));
 }
 
 inline uint64_t tcp_accurate_timer_tsc(TCP *tcp, uint64_t now_tsc)
@@ -915,6 +928,12 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
     uint8_t tx_flags = 0;
     uint8_t rx_flags = th->th_flags;
     uint16_t data_len = 0;
+
+    if(tcp->state == TCP_CLOSE){
+        tcp_release_socket(sk);
+        net_stats_tcp_drop();
+        mbuf_free2(m);
+    }
 
     data = tcp_data_get(iph, th, &data_len);
     if (tcp_check_sequence(tcp, sk, th, data_len) == false)

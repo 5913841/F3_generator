@@ -17,7 +17,8 @@ extern IPV4 *parser_ipv4;
 class IPV4 : public L3_Protocol
 {
 public:
-    IPV4() : L3_Protocol(ProtocolCode::PTC_IPV4) {}
+    IPV4() : L3_Protocol() {}
+    ProtocolCode name() override { return ProtocolCode::PTC_IPV4; }
     static inline iphdr *decode_hdr_pre(rte_mbuf *data)
     {
         return rte_pktmbuf_mtod_offset(data, struct iphdr *, -sizeof(struct iphdr));
@@ -37,15 +38,15 @@ public:
         ip->frag_off = 0;
         ip->ttl = DEFAULT_TTL;
         ip->frag_off = IP_FLAG_DF;
-        if (socket->l4_protocol->name == ProtocolCode::PTC_TCP)
+        if (socket->l4_protocol->name() == ProtocolCode::PTC_TCP)
         {
             ip->protocol = IPPROTO_TCP;
         }
-        else if (socket->l4_protocol->name == ProtocolCode::PTC_UDP)
+        else if (socket->l4_protocol->name() == ProtocolCode::PTC_UDP)
         {
             ip->protocol = IPPROTO_UDP;
         }
-        else if (socket->l4_protocol->name == ProtocolCode::PTC_ICMP)
+        else if (socket->l4_protocol->name() == ProtocolCode::PTC_ICMP)
         {
             ip->protocol = IPPROTO_ICMP;
         }
@@ -88,7 +89,8 @@ public:
 class IPV6 : public Protocol
 {
 public:
-    IPV6() : Protocol(ProtocolCode::PTC_IPV6) {}
+    IPV6() : Protocol() {}
+    ProtocolCode name() override { return ProtocolCode::PTC_IPV6; }
     static inline ip6_hdr *decode_hdr_pre(rte_mbuf *data)
     {
         return rte_pktmbuf_mtod_offset(data, struct ip6_hdr *, -sizeof(struct ip6_hdr));

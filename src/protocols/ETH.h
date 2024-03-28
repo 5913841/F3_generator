@@ -28,8 +28,9 @@ class ETHER : public L2_Protocol
 {
 public:
     netif_port *port;
-    ETHER() : L2_Protocol(ProtocolCode::PTC_ETH), port(nullptr) {}
-    ETHER(netif_port *port) : L2_Protocol(ProtocolCode::PTC_ETH), port(port) {}
+    ETHER() : L2_Protocol(), port(nullptr) {}
+    ETHER(netif_port *port) : L2_Protocol(), port(port) {}
+    ProtocolCode name() override { return ProtocolCode::PTC_ETH; }
     static inline ether_header *decode_hdr_pre(rte_mbuf *data)
     {
         return rte_pktmbuf_mtod_offset(data, struct ether_header *, -sizeof(struct ether_header));
@@ -46,11 +47,11 @@ public:
     {
         ether_header *eth = decode_hdr_pre(data);
 
-        if (socket->l3_protocol->name == ProtocolCode::PTC_IPV4)
+        if (socket->l3_protocol->name() == ProtocolCode::PTC_IPV4)
         {
             eth->ether_type = htons(RTE_ETHER_TYPE_IPV4);
         }
-        else if (socket->l3_protocol->name == ProtocolCode::PTC_IPV6)
+        else if (socket->l3_protocol->name() == ProtocolCode::PTC_IPV6)
         {
             eth->ether_type = htons(RTE_ETHER_TYPE_IPV6);
         }

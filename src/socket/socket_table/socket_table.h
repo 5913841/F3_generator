@@ -24,6 +24,19 @@ public:
         return *it;
     }
 
+    Socket *find_socket(FiveTuples ft)
+    {
+        Socket *socket = new Socket(ft);
+        auto it = socket_table.find(socket);
+        if (it == socket_table.end())
+        {
+            Socket::delete_ft_created_socket(socket);
+            return nullptr;
+        }
+        Socket::delete_ft_created_socket(socket);
+        return *it;
+    }
+
     int insert_socket(Socket *socket)
     {
         auto it = socket_table.insert(socket);

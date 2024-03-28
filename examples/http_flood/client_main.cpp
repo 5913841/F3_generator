@@ -73,6 +73,8 @@ void config_tcp_variables()
     TCP::setted_keepalive_request_num = 0; // client
     TCP::release_socket_callback = [](Socket *sk)
     { socket_table->remove_socket(sk); tcp_release_socket(sk); };
+    TCP::checkvalid_socket_callback = [](FiveTuples ft)
+    { return socket_table->find_socket(ft) != nullptr; };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;
@@ -142,6 +144,7 @@ int start_test(__rte_unused void *arg1)
                 parse_packet(m, parser_socket);
                 Socket *socket = socket_table->find_socket(parser_socket);
                 if (socket != nullptr) socket->l4_protocol->process(socket, m);
+                delete parser_socket;
             }
         } while (m != nullptr);
         dpdk_config_percore::cfg_send_flush();
@@ -167,6 +170,7 @@ int start_test(__rte_unused void *arg1)
                 }
                 tcp_launch(socket);
             }
+            http_ack_delay_flush();
             TIMERS.trigger();
         }
     }

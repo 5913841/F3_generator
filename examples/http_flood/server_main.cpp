@@ -75,6 +75,8 @@ void config_tcp_variables()
     { socket_table->remove_socket(sk); tcp_release_socket(sk); };
     TCP::create_socket_callback = [](Socket *sk)
     { socket_table->insert_socket(sk); };
+    TCP::checkvalid_socket_callback = [](FiveTuples ft)
+    { return socket_table->find_socket(ft) != nullptr; };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;
@@ -94,7 +96,7 @@ void config_tcp_variables()
 void config_http_variables()
 {
     HTTP::parser_init();
-    HTTP::payload_size = 100;
+    HTTP::payload_size = 80;
     HTTP::payload_random = false;
     strcpy(HTTP::http_host, HTTP_HOST_DEFAULT);
     strcpy(HTTP::http_path, HTTP_PATH_DEFAULT);
@@ -152,6 +154,7 @@ int start_test(__rte_unused void *arg1)
                 socket->dst_port = parser_socket->dst_port;
             }
             socket->l4_protocol->process(socket, m);
+            delete parser_socket;
         }
 
         dpdk_config_percore::cfg_send_flush();
@@ -162,6 +165,7 @@ int start_test(__rte_unused void *arg1)
         }
         if (dpdk_config_percore::check_epoch_timer(0.000001 * TSC_PER_SEC))
         {
+            http_ack_delay_flush();
             TIMERS.trigger();
         }
     }

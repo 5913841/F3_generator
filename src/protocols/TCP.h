@@ -63,13 +63,15 @@ public:
     static int setted_keepalive_request_num;
     static std::function<void(Socket *sk)> release_socket_callback;
     static std::function<void(Socket *sk)> create_socket_callback;
+    static std::function<bool(FiveTuples sk)> checkvalid_socket_callback;
     static bool global_tcp_rst;
     static uint8_t tos;
     static bool use_http;
     static uint16_t global_mss;
     static bool constructing_opt_tmeplate;
 
-    TCP() : state(TCP_CLOSE), L4_Protocol(ProtocolCode::PTC_TCP){};
+    TCP() : state(TCP_CLOSE), L4_Protocol(){};
+    ProtocolCode name() override { return ProtocolCode::PTC_TCP; }
     static tcphdr *decode_hdr_pre(rte_mbuf *data)
     {
         return rte_pktmbuf_mtod_offset(data, struct tcphdr *, -sizeof(struct tcphdr));
