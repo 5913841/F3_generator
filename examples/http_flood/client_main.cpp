@@ -36,8 +36,8 @@ dpdk_config_user usrconfig = {
     .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
     .always_accurate_time = true,
-    .tx_burst_size = 10000,
-    .rx_burst_size = 10000,
+    .tx_burst_size = 2048,
+    .rx_burst_size = 2048,
 };
 
 dpdk_config config = dpdk_config(&usrconfig);

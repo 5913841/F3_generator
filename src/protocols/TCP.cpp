@@ -627,7 +627,7 @@ static inline void tcp_reply_more(struct TCP *tcp, struct Socket *sk)
 {
     int i = 0;
     uint32_t snd_una = tcp->snd_una;
-    uint32_t snd_max = tcp->snd_max;
+    uint32_t snd_max = ((HTTP*)sk->l5_protocol)->snd_max;
     uint32_t snd_wnd = snd_una + tcp->send_window;
 
     /* wait a burst finish */

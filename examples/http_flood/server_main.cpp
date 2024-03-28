@@ -36,8 +36,8 @@ dpdk_config_user usrconfig = {
     .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
     .always_accurate_time = true,
-    .tx_burst_size = 10000,
-    .rx_burst_size = 10000,
+    .tx_burst_size = 2048,
+    .rx_burst_size = 2048,
 };
 
 dpdk_config config = dpdk_config(&usrconfig);
@@ -157,7 +157,6 @@ int start_test(__rte_unused void *arg1)
             delete parser_socket;
         }
 
-        dpdk_config_percore::cfg_send_flush();
 
         if (current_ts_msec() - begin_ts > 10 * 1000)
         {
@@ -165,6 +164,7 @@ int start_test(__rte_unused void *arg1)
         }
         if (dpdk_config_percore::check_epoch_timer(0.000001 * TSC_PER_SEC))
         {
+            dpdk_config_percore::cfg_send_flush();
             http_ack_delay_flush();
             TIMERS.trigger();
         }

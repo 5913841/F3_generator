@@ -33,7 +33,6 @@ public:
     uint32_t snd_nxt;
     uint32_t snd_una;
     uint32_t snd_wnd;
-    uint32_t snd_max;
 
     TCP_STATE state : 4;
     uint8_t retrans : 3;

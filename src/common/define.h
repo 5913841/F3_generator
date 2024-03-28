@@ -28,9 +28,6 @@
 #define NETIF_PORT_MAX 4
 #define PCI_LEN 12
 
-#define NB_RXD 4096
-#define NB_TXD 4096
-
 #define RX_BURST_MAX NB_RXD
 #define TX_QUEUE_SIZE NB_TXD
 #define RX_QUEUE_SIZE NB_RXD

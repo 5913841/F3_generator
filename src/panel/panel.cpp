@@ -133,7 +133,7 @@ static void net_stats_print_rtt(struct net_stats *stats, char rtt_str[], int len
 {
     uint64_t rtt_tsc = stats->rtt_tsc;
     uint64_t rtt_num = stats->rtt_num;
-    uint64_t tsc_per_us = 1000 / (1000 * 1000);
+    uint64_t tsc_per_us = 1;
     uint64_t rtt_us = 0;
     uint64_t rtt_us_minor = 0;
     char rtt[STATS_BUF_LEN];
