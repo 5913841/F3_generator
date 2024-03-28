@@ -31,6 +31,8 @@ TCP *parser_tcp = new TCP();
 
 __thread uint32_t ip_id = 0;
 
+static bool close_after_process_fin;
+
 bool tcp_seq_lt(uint32_t a, uint32_t b)
 {
     return 0 < (b - a) && (b - a) < 0x80000000;
@@ -890,7 +892,8 @@ inline uint8_t tcp_process_fin(TCP *tcp, struct Socket *sk, uint8_t rx_flags, ui
         {
             flags = TH_ACK;
             /* enter TIME WAIT */
-            tcp_socket_close(tcp, sk);
+            // tcp_socket_close(tcp, sk);
+            close_after_process_fin = true;
         }
         else
         {
@@ -904,7 +907,8 @@ inline uint8_t tcp_process_fin(TCP *tcp, struct Socket *sk, uint8_t rx_flags, ui
         flags = TH_FIN | TH_ACK;
         break;
     case TCP_LAST_ACK:
-        tcp_socket_close(tcp, sk);
+        // tcp_socket_close(tcp, sk);
+        close_after_process_fin = true;
         break;
     case TCP_FIN_WAIT2:
         /* FIN is here */
@@ -912,7 +916,8 @@ inline uint8_t tcp_process_fin(TCP *tcp, struct Socket *sk, uint8_t rx_flags, ui
         {
             flags = TH_ACK;
             /* enter TIME WAIT */
-            tcp_socket_close(tcp, sk);
+            // tcp_socket_close(tcp, sk);
+            close_after_process_fin = true;
         }
     case TCP_TIME_WAIT:
     default:
@@ -1005,6 +1010,11 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
     else if (tcp->state != TCP_CLOSE)
     {
         tcp_start_timeout_timer(tcp, sk, time_in_config());
+    }
+
+    if (close_after_process_fin)
+    {
+        tcp_socket_close(tcp, sk);
     }
 
     mbuf_free2(m);
@@ -1102,6 +1112,11 @@ static inline void tcp_client_process_data(struct TCP *tcp, struct Socket *sk, s
             tcp_reply(tcp, sk, tx_flags);
         }
     }
+    
+    if (close_after_process_fin)
+    {
+        tcp_socket_close(tcp, sk);
+    }
 
     mbuf_free2(m);
 }
@@ -1141,6 +1156,8 @@ int TCP::process(Socket *sk, rte_mbuf *data)
     int olen = rte_pktmbuf_data_len(data);
 
     TCP *tcp = this;
+
+    close_after_process_fin = false;
 
     if (socket == nullptr)
     {
