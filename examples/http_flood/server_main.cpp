@@ -75,8 +75,8 @@ void config_tcp_variables()
     { socket_table->remove_socket(sk); tcp_release_socket(sk); };
     TCP::create_socket_callback = [](Socket *sk)
     { socket_table->insert_socket(sk); };
-    TCP::checkvalid_socket_callback = [](FiveTuples ft)
-    { return socket_table->find_socket(ft) != nullptr; };
+    TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
+    { return socket_table->find_socket(ft) == sk; };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;

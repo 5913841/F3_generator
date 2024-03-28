@@ -136,6 +136,8 @@ public:
         protocols[layer] = protocol;
     }
 
+    static size_t hash(const Socket *socket);
+
     static size_t hash(const Socket &socket);
 
     static void delete_ft_created_socket(Socket* sk)
@@ -171,7 +173,7 @@ struct SocketPointerHash
 {
     size_t operator()(const Socket *socket) const
     {
-        return Socket::hash(*socket);
+        return Socket::hash(socket);
     }
 };
 #endif

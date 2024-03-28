@@ -20,7 +20,7 @@ uint64_t TCP::keepalive_request_interval;
 int TCP::setted_keepalive_request_num;
 std::function<void(Socket *sk)> TCP::release_socket_callback;
 std::function<void(Socket *sk)> TCP::create_socket_callback;
-std::function<bool(FiveTuples sk)> TCP::checkvalid_socket_callback;
+std::function<bool(FiveTuples ft, Socket* sk)> TCP::checkvalid_socket_callback;
 bool TCP::global_tcp_rst;
 uint8_t TCP::tos;
 bool TCP::use_http;
@@ -239,6 +239,7 @@ static inline int tcp_do_keepalive(TCP *tcp, struct Socket *sk, uint64_t now_tsc
     {
         return -1;
     }
+
     if ((tcp->snd_nxt != tcp->snd_una) || (tcp->state != TCP_ESTABLISHED) || (tcp->keepalive == 0))
     {
         if (tcp->flood)
@@ -278,7 +279,7 @@ struct KeepAliveTimer : public Timer<KeepAliveTimer>
     }
     int callback() override
     {
-        if(!TCP::checkvalid_socket_callback(ft))
+        if(!TCP::checkvalid_socket_callback(ft, sk))
         {
             return -1;
         }
@@ -308,7 +309,7 @@ struct TimeoutTimer : public Timer<TimeoutTimer>
     }
     int callback() override
     {
-        if(!TCP::checkvalid_socket_callback(ft))
+        if(!TCP::checkvalid_socket_callback(ft, sk))
         {
             return -1;
         }
@@ -401,7 +402,7 @@ struct RetransmitTimer : public Timer<RetransmitTimer>
     }
     int callback() override
     {
-        if(!TCP::checkvalid_socket_callback(ft))
+        if(!TCP::checkvalid_socket_callback(ft, sk))
         {
             return -1;
         }
@@ -814,7 +815,7 @@ inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rt
         // SOCKET_LOG_ENABLE(sk);
         // MBUF_LOG(m, "drop-syn");
         // SOCKET_LOG(sk, "drop-bad-syn");
-        tcp_release_socket(sk);
+        tcp->release_socket_callback(sk);
         net_stats_tcp_drop();
     }
 
@@ -930,7 +931,7 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
     uint16_t data_len = 0;
 
     if(tcp->state == TCP_CLOSE){
-        tcp_release_socket(sk);
+        tcp->release_socket_callback(sk);
         net_stats_tcp_drop();
         mbuf_free2(m);
     }

@@ -63,7 +63,7 @@ public:
     static int setted_keepalive_request_num;
     static std::function<void(Socket *sk)> release_socket_callback;
     static std::function<void(Socket *sk)> create_socket_callback;
-    static std::function<bool(FiveTuples sk)> checkvalid_socket_callback;
+    static std::function<bool(FiveTuples ft, Socket *sk)> checkvalid_socket_callback;
     static bool global_tcp_rst;
     static uint8_t tos;
     static bool use_http;

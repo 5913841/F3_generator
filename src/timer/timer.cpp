@@ -141,7 +141,7 @@ SpecificTimers::SpecificTimers(TimerBase *hd)
 void SpecificTimers::trigger()
 {
     uint64_t cur_ts = time_in_config();
-    while (head != tail)
+    while (head->next!=nullptr)
     {
         auto timer = head->next;
         if (timer == nullptr || timer->begin_tsc + delay_tsc > cur_ts)
@@ -155,6 +155,10 @@ void SpecificTimers::trigger()
         }
         head->next = timer->next;
         delete timer;
+    }
+    if (head->next == nullptr)
+    {
+        tail = head;
     }
 }
 

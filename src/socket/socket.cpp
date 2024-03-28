@@ -74,6 +74,29 @@ size_t FiveTuples::hash(const FiveTuples &ft)
     return hash_value;
 }
 
+size_t Socket::hash(const Socket* sk)
+{
+    size_t hash_value = 0x12345678;
+    if (sk) {
+        hash_value += std::hash<uint32_t>()(sk->src_addr.in6.s6_addr32[0]);
+        hash_value += std::hash<uint32_t>()(sk->src_addr.in6.s6_addr32[1]);
+        hash_value += std::hash<uint32_t>()(sk->src_addr.in6.s6_addr32[2]);
+        hash_value += std::hash<uint32_t>()(sk->src_addr.in6.s6_addr32[3]);
+        hash_value += std::hash<uint32_t>()(sk->dst_addr.in6.s6_addr32[0]);
+        hash_value += std::hash<uint32_t>()(sk->dst_addr.in6.s6_addr32[1]);
+        hash_value += std::hash<uint32_t>()(sk->dst_addr.in6.s6_addr32[2]);
+        hash_value += std::hash<uint32_t>()(sk->dst_addr.in6.s6_addr32[3]);
+        hash_value += std::hash<uint16_t>()(sk->src_port);
+        hash_value += std::hash<uint16_t>()(sk->dst_port);
+        for (int i = 0; i < 4; i++)
+        {
+            hash_value += std::hash<uint8_t>()(sk->protocols[i]->name());
+        }
+    }
+    return hash_value;
+}
+
+
 size_t Socket::hash(const Socket &sk)
 {
     size_t hash_value = 0x12345678;

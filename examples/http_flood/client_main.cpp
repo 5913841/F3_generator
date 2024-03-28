@@ -66,15 +66,15 @@ void config_tcp_variables()
     TCP::template_tcp_opt = template_tcp_opt;
     TCP::template_tcp_pkt = template_tcp_pkt;
     TCP::global_duration_time = 60 * 1000;
-    TCP::global_keepalive = true;
+    TCP::global_keepalive = false;
     TCP::global_stop = false;
     /* tsc */
     TCP::keepalive_request_interval = 1000;
     TCP::setted_keepalive_request_num = 0; // client
     TCP::release_socket_callback = [](Socket *sk)
     { socket_table->remove_socket(sk); tcp_release_socket(sk); };
-    TCP::checkvalid_socket_callback = [](FiveTuples ft)
-    { return socket_table->find_socket(ft) != nullptr; };
+    TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
+    { return socket_table->find_socket(ft) == sk; };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;
@@ -165,7 +165,7 @@ int start_test(__rte_unused void *arg1)
                 socket->src_addr = rand() % 11 + base_src;
                 if (socket_table->insert_socket(socket) == -1)
                 {
-                    delete socket;
+                    tcp_release_socket(socket);
                     continue;
                 }
                 tcp_launch(socket);

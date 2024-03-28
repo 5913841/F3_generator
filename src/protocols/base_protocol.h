@@ -42,7 +42,7 @@ struct PacketParser
 class Protocol
 {
 public:
-    virtual ProtocolCode name(){ return PTC_NONE;}
+    virtual ProtocolCode name(){ return PTC_NONE; }
     virtual int construct(Socket *socket, rte_mbuf *data) = 0;
     virtual size_t get_hdr_len(Socket *socket, rte_mbuf *data) = 0;
 };
@@ -52,7 +52,7 @@ class NamedProtocol : public Protocol
 public:
     ProtocolCode code_;
     NamedProtocol(ProtocolCode code) : code_(code) {}
-    virtual ProtocolCode name() { return code_; }
+    virtual ProtocolCode name() override { return code_; }
     virtual int construct(Socket *socket, rte_mbuf *data) {return 0;};
     virtual size_t get_hdr_len(Socket *socket, rte_mbuf *data) {return 0;};
 };
@@ -62,6 +62,7 @@ class L2_Protocol : public Protocol
 public:
     L2_Protocol() = default;
     static PacketParser parser;
+    virtual ProtocolCode name() override { return PTC_NONE; }
     virtual int send_frame(Socket *socket, rte_mbuf *data) = 0;
 };
 
@@ -70,6 +71,7 @@ class L3_Protocol : public Protocol
 public:
     L3_Protocol() = default;
     static PacketParser parser;
+    virtual ProtocolCode name() override { return PTC_NONE; }
 };
 
 class L4_Protocol : public Protocol
@@ -77,6 +79,7 @@ class L4_Protocol : public Protocol
 public:
     L4_Protocol() = default;
     static PacketParser parser;
+    virtual ProtocolCode name() override { return PTC_NONE; }
     virtual int process(Socket *socket, rte_mbuf *data) = 0;
 };
 
@@ -85,6 +88,7 @@ class L5_Protocol : public Protocol
 public:
     L5_Protocol() = default;
     static PacketParser parser;
+    virtual ProtocolCode name() override { return PTC_NONE; }
 };
 
 int parse_packet(rte_mbuf *data, FiveTuples *ft);

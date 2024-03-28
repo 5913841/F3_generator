@@ -29,7 +29,6 @@ public:
 
     void remove_socket(Socket* socket) {
         auto num = socket_tree.erase(FiveTuples(*socket));
-        delete socket;
         if (num == 0) {
             throw std::runtime_error("Socket not found in the tree.");
         }
