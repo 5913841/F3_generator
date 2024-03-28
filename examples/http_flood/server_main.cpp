@@ -169,6 +169,7 @@ int start_test(__rte_unused void *arg1)
             TIMERS.trigger();
         }
     }
+    return 0;
 }
 
 int main(int argc, char **argv)

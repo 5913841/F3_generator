@@ -145,7 +145,7 @@ public:
 
 inline void tcp_launch();
 struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags);
-static inline void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc);
+void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc);
 
 Socket *tcp_new_socket(const Socket *template_socket);
 

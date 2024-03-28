@@ -428,7 +428,7 @@ static inline void tcp_start_timeout_timer(TCP *tcp, struct Socket *sk, uint64_t
     TIMERS.add_job(new TimeoutTimer(sk, now_tsc), now_tsc);
 }
 
-static inline void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
+void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
 {
     if (tcp->keepalive && (tcp->snd_nxt == tcp->snd_una))
     {
@@ -1112,7 +1112,7 @@ static inline void tcp_client_process_data(struct TCP *tcp, struct Socket *sk, s
             tcp_reply(tcp, sk, tx_flags);
         }
     }
-    
+
     if (close_after_process_fin)
     {
         tcp_socket_close(tcp, sk);
