@@ -7,6 +7,7 @@
 #include <netinet/tcp.h>
 #include "dpdk/mbuf_template.h"
 #include <functional>
+#include "timer/rand.h"
 
 bool tcp_seq_lt(uint32_t a, uint32_t b);
 bool tcp_seq_le(uint32_t a, uint32_t b);
@@ -40,13 +41,13 @@ public:
     uint8_t flags; /* tcp flags*/
     uint16_t log : 1;
     uint16_t keepalive_request_num : 15;
-    uint64_t timer_tsc;
     // uint16_t csum_tcp;
     // uint16_t csum_tcp_opt;
     // uint16_t csum_tcp_data;
     // uint16_t csum_ip;
     // uint16_t csum_ip_opt;
     // uint16_t csum_ip_data;
+    uint64_t timer_tsc;
 
     static bool flood;
     static bool server;
@@ -141,6 +142,13 @@ public:
     }
 
     static void timer_init();
+
+    static void tcp_init()
+    {
+        parser_init();
+        timer_init();
+        srand(rte_rdtsc());
+    }
 };
 
 inline void tcp_launch();

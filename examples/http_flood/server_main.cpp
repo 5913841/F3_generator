@@ -36,7 +36,7 @@ dpdk_config_user usrconfig = {
     .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
     .always_accurate_time = true,
-    .tx_burst_size = 2048,
+    .tx_burst_size = 8,
     .rx_burst_size = 2048,
 };
 
@@ -56,8 +56,7 @@ void config_ip_variables()
 
 void config_tcp_variables()
 {
-    TCP::parser_init();
-    TCP::timer_init();
+    TCP::tcp_init();
     TCP::flood = 0;
     TCP::server = 1;
     TCP::send_window = SEND_WINDOW_DEFAULT;
@@ -158,11 +157,11 @@ int start_test(__rte_unused void *arg1)
         }
 
 
-        if (current_ts_msec() - begin_ts > 10 * 1000)
-        {
-            break;
-        }
-        if (dpdk_config_percore::check_epoch_timer(0.000001 * TSC_PER_SEC))
+        // if (current_ts_msec() - begin_ts > 10 * 1000)
+        // {
+        //     break;
+        // }
+        if (dpdk_config_percore::check_epoch_timer(0.001 * TSC_PER_SEC))
         {
             dpdk_config_percore::cfg_send_flush();
             http_ack_delay_flush();

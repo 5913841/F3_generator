@@ -134,44 +134,19 @@ int start_test(__rte_unused void *arg1)
     while (true)
     {
         rte_mbuf *m = nullptr;
-        do
-        {
-            m = dpdk_config_percore::cfg_recv_packet();
-            if (m != nullptr)
-            {
-                Socket *parser_socket = new Socket();
-                parse_packet(m, parser_socket);
-                Socket *socket = socket_table->find_socket(parser_socket);
-                if (socket != nullptr) socket->l4_protocol->process(socket, m);
-                delete parser_socket;
-            }
-        } while (m != nullptr);
+        Socket *socket = tcp_new_socket(template_socket);
+
+        socket->dst_port = rand() % 20 + 1;
+        socket->src_port = rand();
+        socket->src_addr = rand() % 11 + base_src;
+
+        TCP *tcp = (TCP *)socket->l4_protocol;
+        tcp_reply(tcp, socket, TH_SYN);
+
+        tcp_release_socket(socket);
+
         dpdk_config_percore::cfg_send_flush();
-
-        // if (current_ts_msec() - begin_ts > 10 * 1000)
-        // {
-        //     break;
-        // }
-
-        if (dpdk_config_percore::check_epoch_timer(0.000001 * TSC_PER_SEC))
-        {
-            for (int i = 0; i < 10; i++)
-            {
-                Socket *socket = tcp_new_socket(template_socket);
-
-                socket->dst_port = rand() % 20 + 1;
-                socket->src_port = rand();
-                socket->src_addr = rand() % 11 + base_src;
-                if (socket_table->insert_socket(socket) == -1)
-                {
-                    tcp_release_socket(socket);
-                    continue;
-                }
-                tcp_launch(socket);
-            }
-            http_ack_delay_flush();
-            TIMERS.trigger();
-        }
+        dpdk_config_percore::check_epoch_timer(1);
     }
     return 0;
 }

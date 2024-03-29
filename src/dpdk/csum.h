@@ -12,6 +12,42 @@
 #include <netinet/ip.h>
 #include <netinet/ether.h>
 
+static inline uint16_t csum_pseudo_ipv4(uint8_t proto, uint32_t sip, uint32_t dip, uint16_t len)
+{
+    uint32_t csum = 0;
+
+    csum = (sip & 0x0000ffffUL) + (sip >> 16);
+    csum += (dip & 0x0000ffffUL) + (dip >> 16);
+
+    csum += (uint16_t)proto << 8;
+    csum += htons(len);
+
+    csum = (csum & 0x0000ffffUL) + (csum >> 16);
+    csum = (csum & 0x0000ffffUL) + (csum >> 16);
+
+    return (uint16_t)csum;
+}
+
+static inline uint16_t csum_pseudo_ipv6(uint8_t proto, struct in6_addr *saddr, struct in6_addr *daddr,
+    uint16_t len)
+{
+    struct {
+        struct in6_addr saddr;
+        struct in6_addr daddr;
+        uint8_t zero;
+        uint8_t proto;
+        uint16_t len;
+    } hdr;
+
+    hdr.saddr = *saddr;
+    hdr.daddr = *daddr;
+    hdr.zero = 0;
+    hdr.proto = proto;
+    hdr.len = htons(len);
+
+    return rte_raw_cksum((void *)&hdr, sizeof(hdr));
+}
+
 static inline uint16_t csum_update_u32(uint16_t ocsum, uint32_t oval, uint32_t nval)
 {
     uint32_t csum = 0;
@@ -92,30 +128,39 @@ static inline void csum_offload_ip_tcpudp(struct rte_mbuf *m, uint64_t ol_flags)
         iph->ttl = DEFAULT_TTL;
         iph->check = 0;
 
-        // if (unlikely(g_dev_tx_offload_tcpudp_cksum == 0)) {
-        th->th_sum = 0;
-        th->th_sum = rte_ipv4_udptcp_cksum((const struct rte_ipv4_hdr *)iph, th);
-        // } else {
-        //     m->ol_flags = ol_flags | RTE_MBUF_F_TX_IPV4;
-        // }
+        if (unlikely(g_dev_tx_offload_tcpudp_cksum == 0))
+        {
+            th->th_sum = 0;
+            th->th_sum = rte_ipv4_udptcp_cksum((const struct rte_ipv4_hdr *)iph, th);
+        }
+        else
+        {
+            m->ol_flags = ol_flags | RTE_MBUF_F_TX_IPV4;
+        }
 
-        // if (g_dev_tx_offload_ipv4_cksum) {
-        //     m->ol_flags |= RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_IPV4;
-        // } else {
-        iph->check = rte_ipv4_cksum((const struct rte_ipv4_hdr *)iph);
-        // }
+        if (g_dev_tx_offload_ipv4_cksum)
+        {
+            m->ol_flags |= RTE_MBUF_F_TX_IP_CKSUM | RTE_MBUF_F_TX_IPV4;
+        }
+        else
+        {
+            iph->check = rte_ipv4_cksum((const struct rte_ipv4_hdr *)iph);
+        }
     }
     else
     {
         ip6h = (struct ip6_hdr *)iph;
         ip6h->ip6_hops = DEFAULT_TTL;
-        // if (unlikely(g_dev_tx_offload_tcpudp_cksum == 0)) {
-        th->th_sum = 0;
-        th->th_sum = rte_ipv6_udptcp_cksum((const struct rte_ipv6_hdr *)iph, (const void *)th);
-        // } else {
-        //     m->l3_len = sizeof(struct ip6_hdr);
-        //     m->ol_flags = ol_flags | RTE_MBUF_F_TX_IPV6;
-        // }
+        if (unlikely(g_dev_tx_offload_tcpudp_cksum == 0))
+        {
+            th->th_sum = 0;
+            th->th_sum = rte_ipv6_udptcp_cksum((const struct rte_ipv6_hdr *)iph, (const void *)th);
+        }
+        else
+        {
+            m->l3_len = sizeof(struct ip6_hdr);
+            m->ol_flags = ol_flags | RTE_MBUF_F_TX_IPV6;
+        }
     }
 }
 

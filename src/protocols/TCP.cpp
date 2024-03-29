@@ -5,6 +5,8 @@
 #include "protocols/HTTP.h"
 #include "dpdk/csum.h"
 #include "panel/panel.h"
+#include <random>
+#include "timer/rand.h"
 
 bool TCP::flood;
 bool TCP::server;
@@ -107,7 +109,6 @@ static inline void tcp_flags_tx_count(uint8_t tcp_flags)
 inline struct rte_mbuf *tcp_new_packet(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
 {
     uint16_t csum_ip = 0;
-    uint16_t csum_tcp = 0;
     uint16_t snd_seq = 0;
     struct rte_mbuf *m = NULL;
     struct iphdr *iph = NULL;
@@ -160,7 +161,7 @@ inline struct rte_mbuf *tcp_new_packet(TCP *tcp, struct Socket *sk, uint8_t tcp_
     /* we always send from <snd_una> */
     th->th_seq = htonl(tcp->snd_una);
     th->th_ack = htonl(tcp->rcv_nxt);
-    th->th_sum = csum_tcp;
+    th->th_sum = csum_pseudo_ipv4(IPPROTO_TCP, sk->src_addr, sk->dst_addr, p->data.l4_len);
 
     return m;
 }
@@ -1189,6 +1190,8 @@ Socket *tcp_new_socket(const Socket *template_socket)
     Socket *socket = new Socket(*template_socket);
     TCP *tcp = new TCP(*(TCP *)template_socket->l4_protocol);
     tcp->timer_tsc = time_in_config();
+    tcp->snd_nxt = rand_();
+    tcp->snd_una = tcp->snd_nxt;
     socket->l4_protocol = tcp;
     socket->l5_protocol = new HTTP(*(HTTP *)template_socket->l5_protocol);
     return socket;

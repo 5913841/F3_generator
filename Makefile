@@ -1,5 +1,7 @@
 APP := THUGEN
-EXAMPLES := examples/http_flood/client_main.cpp examples/http_flood/server_main.cpp
+# EXAMPLES := examples/http_flood/client_main.cpp examples/http_flood/server_main.cpp examples/tcp_syn_flood/main.cpp examples/scanning/tcp_syn_flood.cpp
+EXAMPLES := examples/tcp_syn_flood/main.cpp
+
 SRCS-y := src/timer/*.cpp src/common/*.cpp src/dpdk/*.cpp src/multi_thread/*.cpp src/protocols/*.cpp src/socket/*.cpp src/panel/*.cpp \
  			# src/socket/socket_table/*.cpp src/socket/socket_vector/*.cpp src/socket/socket_tree/*.cpp
 EX_TO_NA = $(subst examples/,build/,$(subst .cpp,,$1))

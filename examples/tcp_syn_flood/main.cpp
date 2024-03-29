@@ -25,8 +25,6 @@ Socket *template_socket = new Socket();
 mbuf_cache *template_tcp_data = new mbuf_cache();
 mbuf_cache *template_tcp_opt = new mbuf_cache();
 mbuf_cache *template_tcp_pkt = new mbuf_cache();
-const char *data;
-SocketPointerTable *socket_table = new SocketPointerTable();
 
 ipaddr_t target_ip("10.233.1.1");
 
@@ -70,15 +68,10 @@ void config_tcp_variables()
     /* tsc */
     TCP::keepalive_request_interval = 1000;
     TCP::setted_keepalive_request_num = 0; // client
-    TCP::release_socket_callback = [](Socket *sk)
-    { socket_table->remove_socket(sk); tcp_release_socket(sk); };
-    TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
-    { return socket_table->find_socket(ft) == sk; };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;
     TCP::global_mss = MSS_IPV4;
-    data = TCP::server ? http_get_response() : http_get_request();
     template_tcp->timer_tsc = 0;
     template_tcp->retrans = 0;
     template_tcp->keepalive_request_num = 0;
@@ -118,8 +111,6 @@ void config_socket()
 
 void config_template_pkt()
 {
-    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", config.ports[0].id, 0);
-    mbuf_template_pool_setby_socket(template_tcp_data, template_socket, data, strlen(data));
     template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", config.ports[0].id, 0);
     mbuf_template_pool_setby_socket(template_tcp_pkt, template_socket, nullptr, 0);
     TCP::constructing_opt_tmeplate = true;
@@ -134,43 +125,26 @@ int start_test(__rte_unused void *arg1)
     while (true)
     {
         rte_mbuf *m = nullptr;
-        do
-        {
-            m = dpdk_config_percore::cfg_recv_packet();
-            if (m != nullptr)
-            {
-                Socket *parser_socket = new Socket();
-                parse_packet(m, parser_socket);
-                Socket *socket = socket_table->find_socket(parser_socket);
-                if (socket != nullptr) socket->l4_protocol->process(socket, m);
-                delete parser_socket;
-            }
-        } while (m != nullptr);
+        Socket *socket = template_socket;
+        TCP* tcp = template_tcp;
+
+
+        socket->dst_port = rand_() % 20 + 1;
+        socket->src_port = rand_();
+        socket->src_addr = rand_() % 11 + base_src;
+
+        template_tcp->snd_nxt = rand_();
+        // template_tcp->rcv_nxt = 0;
+        
+        tcp_reply(tcp, socket, TH_SYN);
+
+
         dpdk_config_percore::cfg_send_flush();
 
-        // if (current_ts_msec() - begin_ts > 10 * 1000)
-        // {
-        //     break;
-        // }
-
-        if (dpdk_config_percore::check_epoch_timer(0.000001 * TSC_PER_SEC))
+        if (unlikely(tsc_time_go(&g_config_percore->time.second, time_in_config())))
         {
-            for (int i = 0; i < 10; i++)
-            {
-                Socket *socket = tcp_new_socket(template_socket);
-
-                socket->dst_port = rand() % 20 + 1;
-                socket->src_port = rand();
-                socket->src_addr = rand() % 11 + base_src;
-                if (socket_table->insert_socket(socket) == -1)
-                {
-                    tcp_release_socket(socket);
-                    continue;
-                }
-                tcp_launch(socket);
-            }
-            http_ack_delay_flush();
-            TIMERS.trigger();
+            net_stats_timer_handler();
+            net_stats_print_speed(0, g_config_percore->time.second.count);
         }
     }
     return 0;
