@@ -147,7 +147,7 @@ public:
     {
         parser_init();
         timer_init();
-        srand(rte_rdtsc());
+        srand_(rte_rdtsc());
     }
 };
 

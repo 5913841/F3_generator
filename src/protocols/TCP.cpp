@@ -200,9 +200,9 @@ static inline void tcp_process_rst(TCP *tcp, struct Socket *sk, struct rte_mbuf 
     mbuf_free2(m);
 }
 
-inline bool tcp_in_duration(TCP *tcp)
+inline bool tcp_in_duration()
 {
-    if ((current_ts_msec() < (uint64_t)(tcp->global_duration_time)) && (tcp->global_stop == false))
+    if ((current_ts_msec() < (uint64_t)(TCP::global_duration_time)) && (TCP::global_stop == false))
     {
         return true;
     }
@@ -214,7 +214,7 @@ inline bool tcp_in_duration(TCP *tcp)
 
 static inline void tcp_send_keepalive_request(TCP *tcp, struct Socket *sk)
 {
-    if (tcp_in_duration(tcp))
+    if (tcp_in_duration())
     {
         tcp->keepalive_request_num++;
         tcp_reply(tcp, sk, TH_ACK | TH_PUSH);
@@ -247,7 +247,7 @@ static inline int tcp_do_keepalive(TCP *tcp, struct Socket *sk, uint64_t now_tsc
     {
         if (tcp->flood)
         {
-            if (tcp_in_duration(tcp))
+            if (tcp_in_duration())
             {
                 tcp_reply(tcp, sk, TH_SYN);
                 tcp->snd_una = tcp->snd_nxt;
@@ -410,6 +410,10 @@ struct RetransmitTimer : public Timer<RetransmitTimer>
             return -1;
         }
         TCP *tcp = (TCP *)sk->l4_protocol;
+        if(begin_tsc < tcp->timer_tsc)
+        {
+            return -1;
+        }
         return tcp_do_retransmit(tcp, sk, time_in_config());
     }
 };
@@ -464,7 +468,8 @@ struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
 {
     struct rte_mbuf *m = NULL;
     uint64_t now_tsc = 0;
-
+    now_tsc = time_in_config();
+    
     tcp_flags_tx_count(tcp_flags);
 
     if (tcp_flags & TH_PUSH)

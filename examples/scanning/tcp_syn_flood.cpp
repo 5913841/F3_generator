@@ -28,8 +28,6 @@ mbuf_cache *template_tcp_pkt = new mbuf_cache();
 const char *data;
 SocketPointerTable *socket_table = new SocketPointerTable();
 
-ipaddr_t target_ip("10.233.1.1");
-
 dpdk_config_user usrconfig = {
     .lcores = {0},
     .ports = {"0000:01:00.0"},
@@ -107,7 +105,7 @@ void config_http_variables()
 void config_socket()
 {
     template_socket->src_addr = 0;
-    template_socket->dst_addr = target_ip;
+    template_socket->dst_addr = 0;
     template_socket->src_port = 0;
     template_socket->dst_port = 0;
     template_socket->set_protocol(SOCKET_L2, ether);
@@ -127,27 +125,72 @@ void config_template_pkt()
     mbuf_template_pool_setby_socket(template_tcp_opt, template_socket, nullptr, 0);
 }
 
+void scan_c_seg(ipaddr_t* ip_c_segs, uint64_t* duration_times, int ip_c_seg_num)
+{
+    tick_time* tt = new tick_time[ip_c_seg_num];
+    for (int i = 0; i < ip_c_seg_num; i++)
+    {
+        tick_time_init(tt + i);
+    }
+    while(true)
+    {
+        for (int i = 0; i < ip_c_seg_num; i++)
+        {
+            tick_time_update(tt + i);
+            tsc_time_go(&tt[i].second, tt[i].tsc);
+            if (unlikely(tt[i].second.count >= duration_times[i]))
+            {
+                continue;
+            }
+            ipaddr_t ip_c = ip_c_segs[i];
+
+            rte_mbuf *m = nullptr;
+            Socket *socket = tcp_new_socket(template_socket);
+
+            socket->dst_port = 80;
+            if (rand_() % 2 == 0)
+            {
+                socket->dst_port = 443;
+            }
+            socket->src_port = rand_() % (65536 - 1024) + 1024;
+            socket->src_addr = rand_();
+            socket->dst_addr = ip_c + rand_() % 256;
+
+            TCP *tcp = (TCP *)socket->l4_protocol;
+            tcp_reply(tcp, socket, TH_SYN);
+
+            tcp_release_socket(socket);
+
+            dpdk_config_percore::cfg_send_flush();
+        }
+        if (unlikely(tsc_time_go(&g_config_percore->time.second, time_in_config())))
+        {
+            net_stats_timer_handler();
+            net_stats_print_speed(0, g_config_percore->time.second.count);
+        }
+    }
+}
+
+
+
 int start_test(__rte_unused void *arg1)
 {
-    ipaddr_t base_src = ipaddr_t("10.233.1.2");
     uint64_t begin_ts = current_ts_msec();
+    ipaddr_t* ip_c_segs = new ipaddr_t[12];
+    uint64_t* duration_times = new uint64_t[12];
+    int ip_c_seg_num = 0;
+    ipaddr_t ip_base = ipaddr_t("192.168.0.0");
     while (true)
     {
-        rte_mbuf *m = nullptr;
-        Socket *socket = tcp_new_socket(template_socket);
-
-        socket->dst_port = rand() % 20 + 1;
-        socket->src_port = rand();
-        socket->src_addr = rand() % 11 + base_src;
-
-        TCP *tcp = (TCP *)socket->l4_protocol;
-        tcp_reply(tcp, socket, TH_SYN);
-
-        tcp_release_socket(socket);
-
-        dpdk_config_percore::cfg_send_flush();
-        dpdk_config_percore::check_epoch_timer(1);
+        ip_c_seg_num = rand_() % 12 +1;
+        for (int i = 0; i < ip_c_seg_num; i++)
+        {
+            ip_c_segs[i] = ip_base + ((rand_() % 256) << 8);
+            duration_times[i] = 4 * 60;
+        }
+        scan_c_seg(ip_c_segs, duration_times, ip_c_seg_num);
     }
+    delete ip_c_segs;
     return 0;
 }
 

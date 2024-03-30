@@ -56,16 +56,15 @@ void config_ip_variables()
 
 void config_tcp_variables()
 {
-    TCP::tcp_init();
     TCP::flood = 0;
     TCP::server = 1;
-    TCP::send_window = SEND_WINDOW_DEFAULT;
-    // TCP::send_window = 0;
+    // TCP::send_window = SEND_WINDOW_DEFAULT;
+    TCP::send_window = 0;
     TCP::template_tcp_data = template_tcp_data;
     TCP::template_tcp_opt = template_tcp_opt;
     TCP::template_tcp_pkt = template_tcp_pkt;
     TCP::global_duration_time = 60 * 1000;
-    TCP::global_keepalive = true;
+    TCP::global_keepalive = false;
     TCP::global_stop = false;
     /* tsc */
     TCP::keepalive_request_interval = 1000;
@@ -90,6 +89,7 @@ void config_tcp_variables()
     template_tcp->snd_una = template_tcp->snd_nxt;
     template_tcp->rcv_nxt = 0;
     template_tcp->state = TCP_CLOSE;
+    TCP::tcp_init();
 }
 
 void config_http_variables()
