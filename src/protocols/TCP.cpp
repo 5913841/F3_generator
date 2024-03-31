@@ -297,6 +297,7 @@ static inline int tcp_do_timeout(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
     {
         return -1;
     }
+    net_stats_socket_error();
     tcp_socket_close(tcp, sk);
     return -1;
 }
@@ -470,6 +471,7 @@ struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
     uint64_t now_tsc = 0;
     now_tsc = time_in_config();
     
+    tcp->flags = tcp_flags;
     tcp_flags_tx_count(tcp_flags);
 
     if (tcp_flags & TH_PUSH)
