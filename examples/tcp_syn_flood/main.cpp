@@ -130,7 +130,7 @@ int start_test(__rte_unused void *arg1)
 
 
         socket->dst_port = rand_() % 20 + 1;
-        socket->src_port = rand_();
+        socket->src_port = rand_() % (65536 - 1024) + 1024;
         socket->src_addr = rand_() % 11 + base_src;
 
         template_tcp->snd_nxt = rand_();
