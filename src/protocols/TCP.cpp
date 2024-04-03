@@ -22,7 +22,7 @@ uint64_t TCP::keepalive_request_interval;
 int TCP::setted_keepalive_request_num;
 std::function<void(Socket *sk)> TCP::release_socket_callback;
 std::function<void(Socket *sk)> TCP::create_socket_callback;
-std::function<bool(FiveTuples ft, Socket* sk)> TCP::checkvalid_socket_callback;
+std::function<bool(FiveTuples ft, Socket *sk)> TCP::checkvalid_socket_callback;
 bool TCP::global_tcp_rst;
 uint8_t TCP::tos;
 bool TCP::use_http;
@@ -275,14 +275,18 @@ struct KeepAliveTimer : public Timer<KeepAliveTimer>
 {
     Socket *sk;
     FiveTuples ft;
-    KeepAliveTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc) {if(sk) ft = *sk;}
+    KeepAliveTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc)
+    {
+        if (sk)
+            ft = *sk;
+    }
     uint64_t delay_tsc() override
     {
         return TCP::keepalive_request_interval * (g_tsc_per_second / 1000);
     }
     int callback() override
     {
-        if(!TCP::checkvalid_socket_callback(ft, sk))
+        if (!TCP::checkvalid_socket_callback(ft, sk))
         {
             return -1;
         }
@@ -306,14 +310,18 @@ struct TimeoutTimer : public Timer<TimeoutTimer>
 {
     Socket *sk;
     FiveTuples ft;
-    TimeoutTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc) {if(sk) ft = *sk;}
+    TimeoutTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc)
+    {
+        if (sk)
+            ft = *sk;
+    }
     uint64_t delay_tsc() override
     {
         return ((RETRANSMIT_TIMEOUT * RETRANSMIT_NUM_MAX) + TCP::keepalive_request_interval) * (g_tsc_per_second / 1000);
     }
     int callback() override
     {
-        if(!TCP::checkvalid_socket_callback(ft, sk))
+        if (!TCP::checkvalid_socket_callback(ft, sk))
         {
             return -1;
         }
@@ -399,19 +407,23 @@ struct RetransmitTimer : public Timer<RetransmitTimer>
 {
     Socket *sk;
     FiveTuples ft;
-    RetransmitTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc) {if(sk) ft = *sk;}
+    RetransmitTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc)
+    {
+        if (sk)
+            ft = *sk;
+    }
     uint64_t delay_tsc() override
     {
         return RETRANSMIT_TIMEOUT * (g_tsc_per_second / 1000);
     }
     int callback() override
     {
-        if(!TCP::checkvalid_socket_callback(ft, sk))
+        if (!TCP::checkvalid_socket_callback(ft, sk))
         {
             return -1;
         }
         TCP *tcp = (TCP *)sk->l4_protocol;
-        if(begin_tsc < tcp->timer_tsc)
+        if (begin_tsc < tcp->timer_tsc)
         {
             return -1;
         }
@@ -470,7 +482,7 @@ struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
     struct rte_mbuf *m = NULL;
     uint64_t now_tsc = 0;
     now_tsc = time_in_config();
-    
+
     tcp->flags = tcp_flags;
     tcp_flags_tx_count(tcp_flags);
 
@@ -637,7 +649,7 @@ static inline void tcp_reply_more(struct TCP *tcp, struct Socket *sk)
 {
     int i = 0;
     uint32_t snd_una = tcp->snd_una;
-    uint32_t snd_max = ((HTTP*)sk->l5_protocol)->snd_max;
+    uint32_t snd_max = ((HTTP *)sk->l5_protocol)->snd_max;
     uint32_t snd_wnd = snd_una + tcp->send_window;
 
     /* wait a burst finish */
@@ -943,7 +955,8 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
     uint8_t rx_flags = th->th_flags;
     uint16_t data_len = 0;
 
-    if(tcp->state == TCP_CLOSE){
+    if (tcp->state == TCP_CLOSE)
+    {
         tcp->release_socket_callback(sk);
         net_stats_tcp_drop();
         mbuf_free2(m);
@@ -1214,7 +1227,7 @@ void tcp_release_socket(Socket *socket)
 void tcp_launch(Socket *socket)
 {
     TCP *tcp = (TCP *)socket->l4_protocol;
-    tcp_reply(tcp, socket, TH_SYN);
     tcp->state = TCP_SYN_SENT;
+    tcp_reply(tcp, socket, TH_SYN);
     net_stats_socket_open();
 }

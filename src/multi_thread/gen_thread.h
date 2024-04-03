@@ -8,12 +8,7 @@
 class GenThread
 {
 public:
-    uint8_t core_id;
-    uint8_t port_id;
-    uint8_t queue_id;
-    struct netif_port *port;
-    struct tx_queue mbuf_tx;
-    struct rx_queue mbuf_rx;
+    
 };
 
 #endif /* __GEN_THREAD_H__ */

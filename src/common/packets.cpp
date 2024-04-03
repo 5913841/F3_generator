@@ -69,26 +69,26 @@ rte_mbuf *recv_packet_by_queue(struct rx_queue *rq, uint16_t port_id, uint16_t q
             return nullptr;
         }
         rq->tail += nb_rx;
-        if (nb_rx > MBUF_PREFETCH_NUM)
-        {
-            for (int i = 0; i < MBUF_PREFETCH_NUM; i++)
-            {
-                mbuf_prefetch(rq->rx[i]);
-            }
-        }
-        if (rq->head + MBUF_PREFETCH_NUM < rq->tail)
-        {
-            mbuf_prefetch(rq->rx[rq->head + MBUF_PREFETCH_NUM]);
-        }
+        // if (nb_rx > MBUF_PREFETCH_NUM)
+        // {
+        //     for (int i = 0; i < MBUF_PREFETCH_NUM; i++)
+        //     {
+        //         mbuf_prefetch(rq->rx[i]);
+        //     }
+        // }
+        // if (rq->head + MBUF_PREFETCH_NUM < rq->tail)
+        // {
+        //     mbuf_prefetch(rq->rx[rq->head + MBUF_PREFETCH_NUM]);
+        // }
         rq->head += 1;
         return rq->rx[0];
     }
     else
     {
-        if (rq->head + MBUF_PREFETCH_NUM < rq->tail)
-        {
-            mbuf_prefetch(rq->rx[rq->head + MBUF_PREFETCH_NUM]);
-        }
+        // if (rq->head + MBUF_PREFETCH_NUM < rq->tail)
+        // {
+        //     mbuf_prefetch(rq->rx[rq->head + MBUF_PREFETCH_NUM]);
+        // }
         rq->head += 1;
         return rq->rx[rq->head - 1];
     }
