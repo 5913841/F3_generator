@@ -14,6 +14,8 @@
 #include "protocols/base_protocol.h"
 #include <rte_lcore.h>
 
+
+
 // #define RTE_PKTMBUF_HEADROOM 256
 #define MBUF_SIZE (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 
@@ -56,7 +58,7 @@ void config_ip_variables()
 
 void config_tcp_variables()
 {
-    TCP::keepalive_request_interval = 1000;
+    TCP::keepalive_request_interval = 100 * 1000;
     TCP::tcp_init();
     TCP::flood = 0;
     TCP::server = 0;
@@ -66,14 +68,14 @@ void config_tcp_variables()
     TCP::template_tcp_opt = template_tcp_opt;
     TCP::template_tcp_pkt = template_tcp_pkt;
     TCP::global_duration_time = 60 * 1000;
-    TCP::global_keepalive = false;
+    TCP::global_keepalive = true;
     TCP::global_stop = false;
     /* tsc */
-    TCP::setted_keepalive_request_num = 0; // client
+    TCP::setted_keepalive_request_num = 50; // client
     TCP::release_socket_callback = [](Socket *sk)
-    { socket_table->remove_socket(sk); tcp_release_socket(sk); };
+    { ((TCP*)sk->l4_protocol)->state = TCP_CLOSE; };
     TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
-    { return socket_table->find_socket(ft) == sk; };
+    { return ((TCP*)sk->l4_protocol)->state != TCP_CLOSE; };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;
@@ -127,11 +129,32 @@ void config_template_pkt()
     mbuf_template_pool_setby_socket(template_tcp_opt, template_socket, nullptr, 0);
 }
 
+void init_sockets()
+{
+    ipaddr_t base_src = ipaddr_t("10.233.1.0");
+    ipaddr_t base_dst = ipaddr_t("10.234.1.0");
+    srand_(2024);
+    for(int i = 0; i < 25000000; i++)
+    {
+        Socket *socket = tcp_new_socket(template_socket);
+        socket->dst_port = rand_() % 20 + 1;
+        socket->src_port = rand_();
+        socket->src_addr = rand_() % 256 + base_src;
+        socket->dst_addr = rand_() % 256 + base_dst;
+        if (socket_table->insert_socket(socket) == -1)
+        {
+            tcp_release_socket(socket);
+            i--;
+            continue;
+        }
+    }
+}
+
 int start_test(__rte_unused void *arg1)
 {
-    ipaddr_t base_src = ipaddr_t("10.233.1.2");
     uint64_t begin_ts = current_ts_msec();
     Socket *parser_socket = new Socket();
+    auto iter = socket_table->socket_table.begin();
     while (true)
     {
         do
@@ -153,21 +176,13 @@ int start_test(__rte_unused void *arg1)
         //     break;
         // }
 
-        if (dpdk_config_percore::check_epoch_timer(0.000001 * TSC_PER_SEC))
+        if (dpdk_config_percore::check_epoch_timer(0.000002 * TSC_PER_SEC))
         {
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 1; i++)
             {
-                Socket *socket = tcp_new_socket(template_socket);
-
-                socket->dst_port = rand() % 20 + 1;
-                socket->src_port = rand();
-                socket->src_addr = rand() % 11 + base_src;
-                if (socket_table->insert_socket(socket) == -1)
-                {
-                    tcp_release_socket(socket);
-                    continue;
-                }
-                tcp_launch(socket);
+                Socket *socket = *iter;
+                iter++;
+                if (((TCP*)socket->l4_protocol)->state == TCP_CLOSE) tcp_launch(socket);
             }
             http_ack_delay_flush();
             TIMERS.trigger();
@@ -187,5 +202,6 @@ int main(int argc, char **argv)
     config_http_variables();
     config_socket();
     config_template_pkt();
+    init_sockets();
     start_test(NULL);
 }

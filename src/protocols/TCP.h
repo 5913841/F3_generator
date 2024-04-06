@@ -146,12 +146,11 @@ public:
     static void tcp_init()
     {
         parser_init();
-        timer_init();
         srand_(rte_rdtsc());
+        timer_init();
     }
 };
 
-inline void tcp_launch();
 struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags);
 void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc);
 

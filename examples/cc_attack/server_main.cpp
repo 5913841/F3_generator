@@ -56,22 +56,23 @@ void config_ip_variables()
 
 void config_tcp_variables()
 {
-    TCP::keepalive_request_interval = 1000;
-    TCP::tcp_init();
+    TCP::keepalive_request_interval = 100 * 1000;
     TCP::flood = 0;
-    TCP::server = 0;
+    TCP::server = 1;
     // TCP::send_window = SEND_WINDOW_DEFAULT;
     TCP::send_window = 0;
     TCP::template_tcp_data = template_tcp_data;
     TCP::template_tcp_opt = template_tcp_opt;
     TCP::template_tcp_pkt = template_tcp_pkt;
     TCP::global_duration_time = 60 * 1000;
-    TCP::global_keepalive = false;
+    TCP::global_keepalive = true;
     TCP::global_stop = false;
     /* tsc */
-    TCP::setted_keepalive_request_num = 0; // client
+    TCP::setted_keepalive_request_num = 50; // client
     TCP::release_socket_callback = [](Socket *sk)
-    { socket_table->remove_socket(sk); tcp_release_socket(sk); };
+    { ((TCP*)sk->l4_protocol)->state = TCP_CLOSE; };
+    TCP::create_socket_callback = [](Socket *sk)
+    { return; };
     TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
     { return socket_table->find_socket(ft) == sk; };
     TCP::global_tcp_rst = true;
@@ -88,12 +89,13 @@ void config_tcp_variables()
     template_tcp->snd_una = template_tcp->snd_nxt;
     template_tcp->rcv_nxt = 0;
     template_tcp->state = TCP_CLOSE;
+    TCP::tcp_init();
 }
 
 void config_http_variables()
 {
     HTTP::parser_init();
-    HTTP::payload_size = 100;
+    HTTP::payload_size = 80;
     HTTP::payload_random = false;
     strcpy(HTTP::http_host, HTTP_HOST_DEFAULT);
     strcpy(HTTP::http_path, HTTP_PATH_DEFAULT);
@@ -127,48 +129,56 @@ void config_template_pkt()
     mbuf_template_pool_setby_socket(template_tcp_opt, template_socket, nullptr, 0);
 }
 
+void init_sockets()
+{
+    ipaddr_t base_src = ipaddr_t("10.233.1.0");
+    ipaddr_t base_dst = ipaddr_t("10.234.1.0");
+    srand_(2024);
+    for(int i = 0; i < 25000000; i++)
+    {
+        Socket *socket = tcp_new_socket(template_socket);
+        socket->dst_port = rand_() % 20 + 1;
+        socket->src_port = rand_();
+        socket->src_addr = rand_() % 256 + base_src;
+        socket->dst_addr = rand_() % 256 + base_dst;
+        if (socket_table->insert_socket(socket) == -1)
+        {
+            tcp_release_socket(socket);
+            i--;
+            continue;
+        }
+    }
+}
+
 int start_test(__rte_unused void *arg1)
 {
-    ipaddr_t base_src = ipaddr_t("10.233.1.2");
     uint64_t begin_ts = current_ts_msec();
     Socket *parser_socket = new Socket();
     while (true)
     {
-        do
+        rte_mbuf *m = nullptr;
+
+        m = dpdk_config_percore::cfg_recv_packet();
+
+        if (m != nullptr)
         {
-            rte_mbuf *m = dpdk_config_percore::cfg_recv_packet();
-            if (!m)
-            {
-                break;
-            }
             parse_packet(m, parser_socket);
             Socket *socket = socket_table->find_socket(parser_socket);
-            if (socket != nullptr)
-                socket->l4_protocol->process(socket, m);
-        } while (true);
-        dpdk_config_percore::cfg_send_flush();
+            if (socket == nullptr)
+            {
+                mbuf_free2(m);
+                continue;
+            }
+            socket->l4_protocol->process(socket, m);
+        }
 
         // if (current_ts_msec() - begin_ts > 10 * 1000)
         // {
         //     break;
         // }
-
-        if (dpdk_config_percore::check_epoch_timer(0.000001 * TSC_PER_SEC))
+        if (dpdk_config_percore::check_epoch_timer(0.001 * TSC_PER_SEC))
         {
-            for (int i = 0; i < 10; i++)
-            {
-                Socket *socket = tcp_new_socket(template_socket);
-
-                socket->dst_port = rand() % 20 + 1;
-                socket->src_port = rand();
-                socket->src_addr = rand() % 11 + base_src;
-                if (socket_table->insert_socket(socket) == -1)
-                {
-                    tcp_release_socket(socket);
-                    continue;
-                }
-                tcp_launch(socket);
-            }
+            dpdk_config_percore::cfg_send_flush();
             http_ack_delay_flush();
             TIMERS.trigger();
         }
@@ -187,5 +197,6 @@ int main(int argc, char **argv)
     config_http_variables();
     config_socket();
     config_template_pkt();
+    init_sockets();
     start_test(NULL);
 }

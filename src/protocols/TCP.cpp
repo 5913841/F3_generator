@@ -218,7 +218,7 @@ static inline void tcp_send_keepalive_request(TCP *tcp, struct Socket *sk)
     {
         tcp->keepalive_request_num++;
         tcp_reply(tcp, sk, TH_ACK | TH_PUSH);
-        if (unlikely((tcp->keepalive_request_num > 0) && (tcp->keepalive_request_num >= tcp->setted_keepalive_request_num)))
+        if (unlikely((TCP::setted_keepalive_request_num > 0) && (tcp->keepalive_request_num >= TCP::setted_keepalive_request_num)))
         {
             tcp->keepalive = 0;
         }
@@ -485,7 +485,7 @@ struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
 
     tcp->flags = tcp_flags;
     tcp_flags_tx_count(tcp_flags);
-
+    net_stats_tcp_tx();
     if (tcp_flags & TH_PUSH)
     {
         if (TCP::server == 0)
@@ -1180,6 +1180,8 @@ int TCP::process(Socket *sk, rte_mbuf *data)
 
     close_after_process_fin = false;
 
+    net_stats_tcp_rx();
+
     if (socket == nullptr)
     {
         if (TCP::global_tcp_rst)
@@ -1188,7 +1190,7 @@ int TCP::process(Socket *sk, rte_mbuf *data)
         }
         else
         {
-            // net_stats_tcp_drop();
+            net_stats_tcp_drop();
             mbuf_free2(data);
         }
         return 0;

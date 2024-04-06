@@ -133,6 +133,7 @@ int start_test(__rte_unused void *arg1)
 {
     ipaddr_t base_src = ipaddr_t("10.233.1.2");
     uint64_t begin_ts = current_ts_msec();
+    Socket *parser_socket = new Socket();
     while (true)
     {
         rte_mbuf *m = nullptr;
@@ -141,7 +142,6 @@ int start_test(__rte_unused void *arg1)
 
         if (m != nullptr)
         {
-            Socket *parser_socket = new Socket();
             parse_packet(m, parser_socket);
             Socket *socket = socket_table->find_socket(parser_socket);
             if(socket == nullptr)
@@ -153,7 +153,6 @@ int start_test(__rte_unused void *arg1)
                 socket->dst_port = parser_socket->dst_port;
             }
             socket->l4_protocol->process(socket, m);
-            delete parser_socket;
         }
 
 
@@ -161,13 +160,14 @@ int start_test(__rte_unused void *arg1)
         // {
         //     break;
         // }
-        if (dpdk_config_percore::check_epoch_timer(0.001 * TSC_PER_SEC))
+        if (dpdk_config_percore::check_epoch_timer(1 * TSC_PER_SEC))
         {
             dpdk_config_percore::cfg_send_flush();
             http_ack_delay_flush();
             TIMERS.trigger();
         }
     }
+    delete parser_socket;
     return 0;
 }
 
