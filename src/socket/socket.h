@@ -47,8 +47,10 @@ struct ipaddr_t
     }
     ipaddr_t(uint32_t ip_)
     {
+        pad[0] = 0;
+        pad[1] = 0;
+        pad[2] = 0;
         ip.s_addr = htonl(ip_);
-        memset(pad, 0, sizeof(pad));
     }
     ipaddr_t(const ipaddr_t &other) { in6 = other.in6; }
     ipaddr_t() { memset(&in6, 0, sizeof(in6)); }

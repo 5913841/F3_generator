@@ -35,7 +35,7 @@ dpdk_config_user usrconfig = {
     .ports = {"0000:01:00.0"},
     .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
-    .always_accurate_time = true,
+    .always_accurate_time = false,
     .tx_burst_size = 8,
     .rx_burst_size = 2048,
 };
@@ -56,7 +56,7 @@ void config_ip_variables()
 
 void config_tcp_variables()
 {
-    TCP::keepalive_request_interval = 100 * 1000;
+    TCP::keepalive_request_interval = 20 * 1000;
     TCP::flood = 0;
     TCP::server = 1;
     // TCP::send_window = SEND_WINDOW_DEFAULT;
@@ -64,7 +64,7 @@ void config_tcp_variables()
     TCP::template_tcp_data = template_tcp_data;
     TCP::template_tcp_opt = template_tcp_opt;
     TCP::template_tcp_pkt = template_tcp_pkt;
-    TCP::global_duration_time = 60 * 1000;
+    TCP::global_duration_time = 600000 * 1000;
     TCP::global_keepalive = true;
     TCP::global_stop = false;
     /* tsc */
@@ -72,7 +72,7 @@ void config_tcp_variables()
     TCP::release_socket_callback = [](Socket *sk)
     { ((TCP*)sk->l4_protocol)->state = TCP_CLOSE; };
     TCP::create_socket_callback = [](Socket *sk)
-    { return; };
+    { tcp_validate_socket(sk); };
     TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
     { return socket_table->find_socket(ft) == sk; };
     TCP::global_tcp_rst = true;
@@ -134,13 +134,13 @@ void init_sockets()
     ipaddr_t base_src = ipaddr_t("10.233.1.0");
     ipaddr_t base_dst = ipaddr_t("10.234.1.0");
     srand_(2024);
-    for(int i = 0; i < 25000000; i++)
+    for(int i = 0; i < 10000000; i++)
     {
         Socket *socket = tcp_new_socket(template_socket);
-        socket->dst_port = rand_() % 20 + 1;
-        socket->src_port = rand_();
-        socket->src_addr = rand_() % 256 + base_src;
-        socket->dst_addr = rand_() % 256 + base_dst;
+        socket->src_port = rand_() % 20 + 1;
+        socket->dst_port = rand_();
+        socket->dst_addr = rand_() % 256 + base_src;
+        socket->src_addr = rand_() % 256 + base_dst;
         if (socket_table->insert_socket(socket) == -1)
         {
             tcp_release_socket(socket);
@@ -156,6 +156,7 @@ int start_test(__rte_unused void *arg1)
     Socket *parser_socket = new Socket();
     while (true)
     {
+        tick_time_update(&g_config_percore->time);
         rte_mbuf *m = nullptr;
 
         m = dpdk_config_percore::cfg_recv_packet();

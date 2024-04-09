@@ -31,7 +31,7 @@ dpdk_config_user usrconfig = {
     .ports = {"0000:01:00.0"},
     .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
-    .always_accurate_time = true,
+    .always_accurate_time = false,
     .tx_burst_size = 8,
     .rx_burst_size = 2048,
 };
@@ -92,6 +92,7 @@ int start_test(__rte_unused void *arg1)
     uint64_t begin_ts = current_ts_msec();
     while (true)
     {
+        tick_time_update(&g_config_percore->time);
         rte_mbuf *m = nullptr;
         Socket *socket = template_socket;
 

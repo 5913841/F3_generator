@@ -35,7 +35,7 @@ dpdk_config_user usrconfig = {
     .ports = {"0000:01:00.0"},
     .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
-    .always_accurate_time = true,
+    .always_accurate_time = false,
     .tx_burst_size = 8,
     .rx_burst_size = 2048,
 };
@@ -137,6 +137,7 @@ int start_test(__rte_unused void *arg1)
         do
         {
             rte_mbuf *m = dpdk_config_percore::cfg_recv_packet();
+            tick_time_update(&g_config_percore->time);
             if (!m)
             {
                 break;
@@ -147,15 +148,16 @@ int start_test(__rte_unused void *arg1)
                 socket->l4_protocol->process(socket, m);
         } while (true);
         dpdk_config_percore::cfg_send_flush();
+        http_ack_delay_flush();
 
         // if (current_ts_msec() - begin_ts > 10 * 1000)
         // {
         //     break;
         // }
 
-        if (dpdk_config_percore::check_epoch_timer(0.000001 * TSC_PER_SEC))
+        if (dpdk_config_percore::check_epoch_timer(0.00001 * TSC_PER_SEC))
         {
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 6; i++)
             {
                 Socket *socket = tcp_new_socket(template_socket);
 
@@ -169,7 +171,6 @@ int start_test(__rte_unused void *arg1)
                 }
                 tcp_launch(socket);
             }
-            http_ack_delay_flush();
             TIMERS.trigger();
         }
     }

@@ -61,9 +61,12 @@ public:
     /* tsc */
     static uint64_t keepalive_request_interval;
     static int setted_keepalive_request_num;
-    static std::function<void(Socket *sk)> release_socket_callback;
-    static std::function<void(Socket *sk)> create_socket_callback;
-    static std::function<bool(FiveTuples ft, Socket *sk)> checkvalid_socket_callback;
+    // static std::function<void(Socket *sk)> release_socket_callback;
+    // static std::function<void(Socket *sk)> create_socket_callback;
+    // static std::function<bool(FiveTuples ft, Socket *sk)> checkvalid_socket_callback;
+    static void(*release_socket_callback)(Socket *sk);
+    static void(*create_socket_callback)(Socket *sk);
+    static bool(*checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
     static bool global_tcp_rst;
     static uint8_t tos;
     static bool use_http;
@@ -159,5 +162,7 @@ Socket *tcp_new_socket(const Socket *template_socket);
 void tcp_release_socket(Socket *socket);
 
 void tcp_launch(Socket *socket);
+
+void tcp_validate_socket(Socket *socket);
 
 #endif

@@ -33,7 +33,7 @@ dpdk_config_user usrconfig = {
     .ports = {"0000:01:00.0"},
     .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
-    .always_accurate_time = true,
+    .always_accurate_time = false,
     .tx_burst_size = 8,
     .rx_burst_size = 2048,
 };
@@ -134,8 +134,10 @@ void scan_c_seg(ipaddr_t* ip_c_segs, uint64_t* duration_times, int ip_c_seg_num)
     }
     while(true)
     {
+        tick_time_update(&g_config_percore->time);
         for (int i = 0; i < ip_c_seg_num; i++)
         {
+            tick_time_update(&g_config_percore->time);
             tick_time_update(tt + i);
             tsc_time_go(&tt[i].second, tt[i].tsc);
             if (unlikely(tt[i].second.count >= duration_times[i]))

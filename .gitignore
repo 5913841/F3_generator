@@ -1,6 +1,10 @@
-.vscode
-build
-perf.*
-*.pcap
-test*
-*.log
+*
+!examples
+!src
+!examples/
+!src/
+!dumpcap
+!*.sh
+!.gitignore
+!.gitmodules
+!makefile

@@ -24,8 +24,11 @@ enum ProtocolCode
     PTC_ETH,
 };
 
-typedef std::function<int(rte_mbuf *, FiveTuples *, int)> parse_fivetuples_t;
-typedef std::function<int(rte_mbuf *, Socket *, int)> parse_socket_t;
+// typedef std::function<int(rte_mbuf *, FiveTuples *, int)> parse_fivetuples_t;
+// typedef std::function<int(rte_mbuf *, Socket *, int)> parse_socket_t;
+
+typedef int (*parse_fivetuples_t)(rte_mbuf *, FiveTuples *, int);
+typedef int (*parse_socket_t)(rte_mbuf *, Socket *, int);
 
 struct PacketParser
 {

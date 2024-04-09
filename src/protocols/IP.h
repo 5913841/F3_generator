@@ -74,8 +74,8 @@ public:
         sk->l3_protocol = parser_ipv4;
         iphdr *ip = rte_pktmbuf_mtod_offset(data, struct iphdr *, offset);
         // exchange src and dst
-        sk->src_addr = ntohl(ip->daddr);
-        sk->dst_addr = ntohl(ip->saddr);
+        sk->src_addr.ip.s_addr = ip->daddr;
+        sk->dst_addr.ip.s_addr = ip->saddr;
         return sizeof(struct iphdr);
     }
 

@@ -35,7 +35,7 @@ dpdk_config_user usrconfig = {
     .ports = {"0000:01:00.0"},
     .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
-    .always_accurate_time = true,
+    .always_accurate_time = false,
     .tx_burst_size = 8,
     .rx_burst_size = 2048,
 };
@@ -72,7 +72,7 @@ void config_tcp_variables()
     TCP::release_socket_callback = [](Socket *sk)
     { socket_table->remove_socket(sk); tcp_release_socket(sk); };
     TCP::create_socket_callback = [](Socket *sk)
-    { socket_table->insert_socket(sk); };
+    { socket_table->insert_socket(sk); tcp_validate_socket(sk); };
     TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
     { return socket_table->find_socket(ft) == sk; };
     TCP::global_tcp_rst = true;
@@ -136,6 +136,7 @@ int start_test(__rte_unused void *arg1)
     Socket *parser_socket = new Socket();
     while (true)
     {
+        tick_time_update(&g_config_percore->time);
         rte_mbuf *m = nullptr;
 
         m = dpdk_config_percore::cfg_recv_packet();
@@ -155,15 +156,15 @@ int start_test(__rte_unused void *arg1)
             socket->l4_protocol->process(socket, m);
         }
 
+        dpdk_config_percore::cfg_send_flush();
+        http_ack_delay_flush();
 
         // if (current_ts_msec() - begin_ts > 10 * 1000)
         // {
         //     break;
         // }
-        if (dpdk_config_percore::check_epoch_timer(1 * TSC_PER_SEC))
+        if (dpdk_config_percore::check_epoch_timer(0.00001 * TSC_PER_SEC))
         {
-            dpdk_config_percore::cfg_send_flush();
-            http_ack_delay_flush();
             TIMERS.trigger();
         }
     }

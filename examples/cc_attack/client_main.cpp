@@ -37,7 +37,7 @@ dpdk_config_user usrconfig = {
     .ports = {"0000:01:00.0"},
     .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
-    .always_accurate_time = true,
+    .always_accurate_time = false,
     .tx_burst_size = 8,
     .rx_burst_size = 2048,
 };
@@ -58,7 +58,7 @@ void config_ip_variables()
 
 void config_tcp_variables()
 {
-    TCP::keepalive_request_interval = 100 * 1000;
+    TCP::keepalive_request_interval = 20 * 1000;
     TCP::tcp_init();
     TCP::flood = 0;
     TCP::server = 0;
@@ -67,7 +67,7 @@ void config_tcp_variables()
     TCP::template_tcp_data = template_tcp_data;
     TCP::template_tcp_opt = template_tcp_opt;
     TCP::template_tcp_pkt = template_tcp_pkt;
-    TCP::global_duration_time = 60 * 1000;
+    TCP::global_duration_time = 600000 * 1000;
     TCP::global_keepalive = true;
     TCP::global_stop = false;
     /* tsc */
@@ -134,7 +134,7 @@ void init_sockets()
     ipaddr_t base_src = ipaddr_t("10.233.1.0");
     ipaddr_t base_dst = ipaddr_t("10.234.1.0");
     srand_(2024);
-    for(int i = 0; i < 25000000; i++)
+    for(int i = 0; i < 5000000; i++)
     {
         Socket *socket = tcp_new_socket(template_socket);
         socket->dst_port = rand_() % 20 + 1;
@@ -160,6 +160,7 @@ int start_test(__rte_unused void *arg1)
         do
         {
             rte_mbuf *m = dpdk_config_percore::cfg_recv_packet();
+            tick_time_update(&g_config_percore->time);
             if (!m)
             {
                 break;
@@ -180,6 +181,7 @@ int start_test(__rte_unused void *arg1)
         {
             for (int i = 0; i < 1; i++)
             {
+                if (unlikely(iter == socket_table->socket_table.end())) iter = socket_table->socket_table.begin();
                 Socket *socket = *iter;
                 iter++;
                 if (((TCP*)socket->l4_protocol)->state == TCP_CLOSE) tcp_launch(socket);

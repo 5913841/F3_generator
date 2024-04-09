@@ -31,9 +31,12 @@ struct tick_time
 
 static inline uint64_t tsc_time_go(struct tsc_time *tt, uint64_t tsc_now)
 {
-    uint64_t count = (tsc_now - tt->last) / tt->interval;
-    tt->count += count;
-    tt->last += count * tt->interval;
+    uint64_t count = 0;
+    while (tt->last + tt->interval <= tsc_now) {
+        tt->count++;
+        tt->last += tt->interval;
+        count++;
+    }
     return count;
 }
 

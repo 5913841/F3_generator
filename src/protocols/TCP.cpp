@@ -20,9 +20,12 @@ bool TCP::global_stop;
 // ms
 uint64_t TCP::keepalive_request_interval;
 int TCP::setted_keepalive_request_num;
-std::function<void(Socket *sk)> TCP::release_socket_callback;
-std::function<void(Socket *sk)> TCP::create_socket_callback;
-std::function<bool(FiveTuples ft, Socket *sk)> TCP::checkvalid_socket_callback;
+// std::function<void(Socket *sk)> TCP::release_socket_callback;
+// std::function<void(Socket *sk)> TCP::create_socket_callback;
+// std::function<bool(FiveTuples ft, Socket *sk)> TCP::checkvalid_socket_callback;
+void (*TCP::release_socket_callback)(Socket *sk);
+void (*TCP::create_socket_callback)(Socket *sk);
+bool (*TCP::checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
 bool TCP::global_tcp_rst;
 uint8_t TCP::tos;
 bool TCP::use_http;
@@ -291,6 +294,10 @@ struct KeepAliveTimer : public Timer<KeepAliveTimer>
             return -1;
         }
         TCP *tcp = (TCP *)sk->l4_protocol;
+        if (begin_tsc < tcp->timer_tsc)
+        {
+            return -1;
+        }
         return tcp_do_keepalive(tcp, sk, time_in_config());
     }
 };
@@ -1211,9 +1218,6 @@ Socket *tcp_new_socket(const Socket *template_socket)
 {
     Socket *socket = new Socket(*template_socket);
     TCP *tcp = new TCP(*(TCP *)template_socket->l4_protocol);
-    tcp->timer_tsc = time_in_config();
-    tcp->snd_nxt = rand_();
-    tcp->snd_una = tcp->snd_nxt;
     socket->l4_protocol = tcp;
     socket->l5_protocol = new HTTP(*(HTTP *)template_socket->l5_protocol);
     return socket;
@@ -1226,9 +1230,20 @@ void tcp_release_socket(Socket *socket)
     delete socket;
 }
 
+void tcp_validate_socket(Socket *socket)
+{
+    TCP *tcp = (TCP *)socket->l4_protocol;
+    tcp->timer_tsc = time_in_config();
+    tcp->snd_nxt = rand_();
+    tcp->snd_una = tcp->snd_nxt;
+}
+
 void tcp_launch(Socket *socket)
 {
     TCP *tcp = (TCP *)socket->l4_protocol;
+    tcp->timer_tsc = time_in_config();
+    tcp->snd_nxt = rand_();
+    tcp->snd_una = tcp->snd_nxt;
     tcp->state = TCP_SYN_SENT;
     tcp_reply(tcp, socket, TH_SYN);
     net_stats_socket_open();
