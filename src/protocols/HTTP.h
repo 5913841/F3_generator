@@ -3,7 +3,7 @@
 
 #include "protocols/base_protocol.h"
 #include "protocols/TCP.h"
-#include "timer/timer.h"
+#include "timer/clock.h"
 #include "dpdk/dpdk_config.h"
 
 class HTTP;
@@ -64,6 +64,10 @@ public:
     inline size_t get_hdr_len(Socket *socket, rte_mbuf *data)
     {
         return 0;
+    }
+    size_t hash() override
+    {
+        return std::hash<uint8_t>()(PTC_HTTP);
     }
     inline int construct(Socket *socket, rte_mbuf *data)
     {
@@ -191,7 +195,7 @@ static inline uint8_t http_client_process_data(struct Socket *sk,
         if (tcp->keepalive && ((rx_flags & TH_FIN) == 0))
         {
             http_ack_delay_add(sk);
-            tcp_start_keepalive_timer(tcp, sk, time_in_config());
+            tcp_start_keepalive_timer(sk, time_in_config());
             return 0;
         }
         else

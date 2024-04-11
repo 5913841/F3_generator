@@ -1,12 +1,10 @@
 #include "protocols/UDP.h"
-#include "protocols/TCP.h"
 #include "protocols/IP.h"
 #include "dpdk/dpdk_config.h"
 #include "dpdk/mbuf.h"
 #include "dpdk/mbuf_template.h"
 #include "panel/panel.h"
 #include "socket/socket.h"
-#include "timer/timer.h"
 #include "dpdk/csum.h"
 #include <sys/time.h>
 #include <rte_mbuf.h>
@@ -122,12 +120,6 @@ static void udp_close(struct Socket *sk)
 
 static inline void udp_retransmit_handler(struct Socket *sk)
 {
-    /* rss auto: this socket is closed by another worker */
-    if (sk->src_addr != 0)
-    {
-        net_stats_udp_rt();
-    }
-
     UDP::release_socket_callback(sk);
 }
 
@@ -158,7 +150,7 @@ static void udp_do_keepalive(struct Socket *sk)
     if (udp_in_duration())
     {
         /* rss auto: this socket is closed by another worker */
-        if (unlikely(sk->src_addr == ipaddr_t(0)))
+        if (unlikely(sk->src_addr == ip4addr_t(0)))
         {
             udp_close(sk);
             return;
@@ -182,32 +174,25 @@ static void udp_do_keepalive(struct Socket *sk)
     }
 }
 
-struct UdpKeepAliveTimer : public Timer<UdpKeepAliveTimer>
+struct UDPKeepAliveTimerQueue : public UniqueTimerQueue
 {
-    Socket *sk;
-    FiveTuples ft;
-    UdpKeepAliveTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc)
+    UDPKeepAliveTimerQueue()
     {
-        if (sk)
-            ft = *sk;
+        unique_queue_init(this);
+        delay_tsc = UDP::keepalive_request_interval * (g_tsc_per_second / 1000);
     }
-    uint64_t delay_tsc() override
+    void callback(UniqueTimer *timer) override
     {
-        return UDP::keepalive_request_interval * (g_tsc_per_second / 1000);
+        udp_do_keepalive(((UDP*)timer)->socket);
     }
-    int callback() override
-    {
-        udp_do_keepalive(sk);
-        return -1;
-    }
-};
+} udpkeepalive_timer_queue;
 
 void udp_start_keepalive_timer(struct Socket *sk, uint64_t now_tsc)
 {
     UDP *udp = (UDP *)sk->l4_protocol;
     if (udp->keepalive)
     {
-        TIMERS.add_job(new UdpKeepAliveTimer(sk, now_tsc), now_tsc);
+        unique_queue_add(&udpkeepalive_timer_queue, &udp->timer, now_tsc);
     }
 }
 

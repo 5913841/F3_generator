@@ -128,4 +128,6 @@
 
 #define THREAD_NUM_MAX 64
 
+#define MAX_UNIQUE_TIMER_SIZE 3
+
 #endif

@@ -7,7 +7,7 @@
 #include "common/utils.h"
 #include "arpa/inet.h"
 #include "common/packets.h"
-#include "timer/timer.h"
+#include "timer/clock.h"
 #include "panel/panel.h"
 
 struct dpdk_config;
@@ -37,6 +37,7 @@ struct dpdk_config
     dpdk_config(dpdk_config_user *user_config);
 };
 
+uint64_t& time_in_config();
 struct dpdk_config_percore
 {
     int epoch_work;
@@ -74,9 +75,27 @@ struct dpdk_config_percore
         tx_queue_flush(g_config_percore->tq, g_config_percore->port_id, g_config_percore->queue_id);
     }
 
-    static bool check_epoch_timer(uint64_t gap_tsc);
+    static inline bool check_epoch_timer(uint64_t gap_tsc)
+    {
+        tick_time_update(&g_config_percore->time);
+        CPULOAD_ADD_TSC(&g_config_percore->cpusage, time_in_config(), g_config_percore->epoch_work);
+
+        if (unlikely(tsc_time_go(&g_config_percore->time.second, time_in_config())))
+        {
+            net_stats_timer_handler();
+            net_stats_print_speed(0, g_config_percore->time.second.count);
+        }
+
+        if (unlikely(time_in_config() - g_config_percore->epoch_last_tsc >= gap_tsc))
+        {
+            g_config_percore->epoch_work += 1;
+            g_config_percore->epoch_last_tsc = time_in_config();
+            return true;
+        }
+
+        return false;
+    }
 };
 
-uint64_t& time_in_config();
 
 #endif /* DPDK_CONFIG_H_ */

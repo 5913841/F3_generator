@@ -77,7 +77,6 @@ void config_tcp_variables()
     TCP::use_http = true;
     TCP::global_mss = MSS_IPV4;
     data = TCP::server ? http_get_response() : http_get_request();
-    template_tcp->timer_tsc = 0;
     template_tcp->retrans = 0;
     template_tcp->keepalive_request_num = 0;
     template_tcp->keepalive = TCP::global_keepalive;
@@ -125,7 +124,7 @@ void config_template_pkt()
     mbuf_template_pool_setby_socket(template_tcp_opt, template_socket, nullptr, 0);
 }
 
-void scan_c_seg(ipaddr_t* ip_c_segs, uint64_t* duration_times, int ip_c_seg_num)
+void scan_c_seg(ip4addr_t* ip_c_segs, uint64_t* duration_times, int ip_c_seg_num)
 {
     tick_time* tt = new tick_time[ip_c_seg_num];
     for (int i = 0; i < ip_c_seg_num; i++)
@@ -144,7 +143,7 @@ void scan_c_seg(ipaddr_t* ip_c_segs, uint64_t* duration_times, int ip_c_seg_num)
             {
                 continue;
             }
-            ipaddr_t ip_c = ip_c_segs[i];
+            ip4addr_t ip_c = ip_c_segs[i];
 
             rte_mbuf *m = nullptr;
             Socket *socket = tcp_new_socket(template_socket);
@@ -157,9 +156,10 @@ void scan_c_seg(ipaddr_t* ip_c_segs, uint64_t* duration_times, int ip_c_seg_num)
             socket->src_port = rand_() % (65536 - 1024) + 1024;
             socket->src_addr = rand_();
             socket->dst_addr = ip_c + rand_() % 256;
+            tcp_validate_csum_opt(socket);
 
             TCP *tcp = (TCP *)socket->l4_protocol;
-            tcp_reply(tcp, socket, TH_SYN);
+            tcp_reply(socket, TH_SYN);
 
             tcp_release_socket(socket);
 
@@ -178,10 +178,10 @@ void scan_c_seg(ipaddr_t* ip_c_segs, uint64_t* duration_times, int ip_c_seg_num)
 int start_test(__rte_unused void *arg1)
 {
     uint64_t begin_ts = current_ts_msec();
-    ipaddr_t* ip_c_segs = new ipaddr_t[12];
+    ip4addr_t* ip_c_segs = new ip4addr_t[12];
     uint64_t* duration_times = new uint64_t[12];
     int ip_c_seg_num = 0;
-    ipaddr_t ip_base = ipaddr_t("192.168.0.0");
+    ip4addr_t ip_base = ip4addr_t("192.168.0.0");
     while (true)
     {
         ip_c_seg_num = rand_() % 12 +1;

@@ -24,7 +24,7 @@ Socket *template_socket = new Socket();
 mbuf_cache *template_udp_pkt = new mbuf_cache();
 const char *data;
 
-ipaddr_t target_ip("10.233.1.1");
+ip4addr_t target_ip("10.233.1.1");
 
 dpdk_config_user usrconfig = {
     .lcores = {0},
@@ -88,7 +88,7 @@ void config_template_pkt()
 
 int start_test(__rte_unused void *arg1)
 {
-    ipaddr_t base_src = ipaddr_t("10.233.1.2");
+    ip4addr_t base_src = ip4addr_t("10.233.1.2");
     uint64_t begin_ts = current_ts_msec();
     while (true)
     {

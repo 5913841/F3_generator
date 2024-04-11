@@ -8,6 +8,7 @@
 #include "dpdk/dpdk_config.h"
 #include "protocols/base_protocol.h"
 #include "dpdk/mbuf_template.h"
+#include "timer/unique_timer.h"
 
 void udp_set_payload(int page_size);
 int udp_launch(Socket *socket);
@@ -18,6 +19,8 @@ struct UDP : public L4_Protocol
 {
 public:
     UDP() : state(TCP_CLOSE), L4_Protocol(){};
+    Socket *socket;
+    UniqueTimer timer;
     uint8_t state;
     uint16_t keepalive_request_num : 15;
     uint16_t keepalive : 1;
@@ -40,6 +43,11 @@ public:
     size_t get_hdr_len(Socket *socket, rte_mbuf *data)
     {
         return sizeof(struct udphdr);
+    }
+    
+    size_t hash() override
+    {
+        return std::hash<uint8_t>()(PTC_UDP);
     }
 
     int process(Socket *socket, rte_mbuf *data)

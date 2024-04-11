@@ -30,7 +30,7 @@ const char *data;
 SocketPointerTable *socket_table = new SocketPointerTable();
 SocketVector *socket_vector = new SocketVector();
 
-ipaddr_t target_ip("10.233.1.1");
+ip4addr_t target_ip("10.233.1.1");
 
 dpdk_config_user usrconfig = {
     .lcores = {0},
@@ -39,7 +39,7 @@ dpdk_config_user usrconfig = {
     .queue_num_per_port = {1},
     .always_accurate_time = false,
     .tx_burst_size = 8,
-    .rx_burst_size = 2048,
+    .rx_burst_size = 8,
 };
 
 dpdk_config config = dpdk_config(&usrconfig);
@@ -81,7 +81,6 @@ void config_tcp_variables()
     TCP::use_http = true;
     TCP::global_mss = MSS_IPV4;
     data = TCP::server ? http_get_response() : http_get_request();
-    template_tcp->timer_tsc = 0;
     template_tcp->retrans = 0;
     template_tcp->keepalive_request_num = 0;
     template_tcp->keepalive = TCP::global_keepalive;
@@ -131,16 +130,17 @@ void config_template_pkt()
 
 void init_sockets()
 {
-    ipaddr_t base_src = ipaddr_t("10.233.1.0");
-    ipaddr_t base_dst = ipaddr_t("10.234.1.0");
+    ip4addr_t base_src = ip4addr_t("10.233.1.0");
+    ip4addr_t base_dst = ip4addr_t("10.234.1.0");
     srand_(2024);
-    for(int i = 0; i < 25000000; i++)
+    for(int i = 0; i < 5000000; i++)
     {
         Socket *socket = tcp_new_socket(template_socket);
         socket->dst_port = rand_() % 20 + 1;
         socket->src_port = rand_();
         socket->dst_addr = rand_() % 256 + base_dst;
         socket->src_addr = rand_() % 256 + base_src;
+        tcp_validate_csum(socket);
         socket_vector->add_socket(*socket);
     }
 }
@@ -154,6 +154,8 @@ int start_test(__rte_unused void *arg1)
     {
         do
         {
+            dpdk_config_percore::cfg_send_flush();
+            http_ack_delay_flush();
             rte_mbuf *m = dpdk_config_percore::cfg_recv_packet();
             tick_time_update(&g_config_percore->time);
             if (!m)
@@ -165,8 +167,6 @@ int start_test(__rte_unused void *arg1)
             if (socket != nullptr)
                 socket->l4_protocol->process(socket, m);
         } while (true);
-        dpdk_config_percore::cfg_send_flush();
-        http_ack_delay_flush();
 
         // if (current_ts_msec() - begin_ts > 10 * 1000)
         // {
@@ -183,6 +183,7 @@ int start_test(__rte_unused void *arg1)
                 {
                     continue;
                 }
+                tick_time_update(&g_config_percore->time);
                 tcp_launch(socket);
             }
             TIMERS.trigger();

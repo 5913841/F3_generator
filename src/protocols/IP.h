@@ -27,6 +27,10 @@ public:
     {
         return sizeof(struct iphdr);
     }
+    size_t hash() override
+    {
+        return std::hash<uint8_t>()(PTC_IPV4);
+    }
     inline int construct(Socket *socket, rte_mbuf *data)
     {
         iphdr *ip = decode_hdr_pre(data);

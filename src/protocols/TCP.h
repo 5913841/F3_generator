@@ -8,6 +8,7 @@
 #include "dpdk/mbuf_template.h"
 #include <functional>
 #include "timer/rand.h"
+#include "timer/unique_timer.h"
 
 bool tcp_seq_lt(uint32_t a, uint32_t b);
 bool tcp_seq_le(uint32_t a, uint32_t b);
@@ -30,24 +31,23 @@ extern TCP *parser_tcp;
 class TCP : public L4_Protocol
 {
 public:
+    UniqueTimer timer;
     uint32_t rcv_nxt;
     uint32_t snd_nxt;
     uint32_t snd_una;
     uint32_t snd_wnd;
-
+    uint16_t log : 1;
+    uint16_t keepalive_request_num : 15;
+    uint16_t csum_tcp;
+    uint16_t csum_tcp_opt;
+    uint16_t csum_tcp_data;
+    // uint16_t csum_ip;
+    // uint16_t csum_ip_opt;
+    // uint16_t csum_ip_data;
     TCP_STATE state : 4;
     uint8_t retrans : 3;
     uint8_t keepalive : 1;
     uint8_t flags; /* tcp flags*/
-    uint16_t log : 1;
-    uint16_t keepalive_request_num : 15;
-    // uint16_t csum_tcp;
-    // uint16_t csum_tcp_opt;
-    // uint16_t csum_tcp_data;
-    // uint16_t csum_ip;
-    // uint16_t csum_ip_opt;
-    // uint16_t csum_ip_data;
-    uint64_t timer_tsc;
 
     static bool flood;
     static bool server;
@@ -82,6 +82,10 @@ public:
     size_t get_hdr_len(Socket *socket, rte_mbuf *data)
     {
         return sizeof(struct tcphdr);
+    }
+    size_t hash() override
+    {
+        return std::hash<uint8_t>()(PTC_TCP);
     }
     int construct(Socket *socket, rte_mbuf *data)
     {
@@ -154,8 +158,8 @@ public:
     }
 };
 
-struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags);
-void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc);
+struct rte_mbuf *tcp_reply(struct Socket *sk, uint8_t tcp_flags);
+void tcp_start_keepalive_timer(struct Socket *sk, uint64_t now_tsc);
 
 Socket *tcp_new_socket(const Socket *template_socket);
 
@@ -164,5 +168,9 @@ void tcp_release_socket(Socket *socket);
 void tcp_launch(Socket *socket);
 
 void tcp_validate_socket(Socket *socket);
+
+void tcp_validate_csum(Socket* scoket);
+
+void tcp_validate_csum_opt(Socket* scoket);
 
 #endif

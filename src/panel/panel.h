@@ -322,7 +322,7 @@ extern __thread struct net_stats g_net_stats;
     do                                                           \
     {                                                            \
         g_net_stats.rtt_num++;                                   \
-        g_net_stats.rtt_tsc += time_in_config() - tcp->timer_tsc; \
+        g_net_stats.rtt_tsc += time_in_config() - tcp->timer.timer_tsc; \
     } while (0)
 
 #define net_stats_tos_ipv4_rx(iph)              \

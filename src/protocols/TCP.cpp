@@ -1,7 +1,7 @@
 #include "protocols/TCP.h"
 #include "protocols/IP.h"
 #include "protocols/ETH.h"
-#include "timer/timer.h"
+#include "timer/unique_timer.h"
 #include "protocols/HTTP.h"
 #include "dpdk/csum.h"
 #include "panel/panel.h"
@@ -37,6 +37,10 @@ TCP *parser_tcp = new TCP();
 __thread uint32_t ip_id = 0;
 
 static bool close_after_process_fin;
+
+extern void tcp_start_retransmit_timer(Socket *sk, uint64_t now_tsc);
+extern void tcp_start_timeout_timer(Socket *sk, uint64_t now_tsc);
+extern void tcp_start_keepalive_timer(Socket *sk, uint64_t now_tsc);
 
 bool tcp_seq_lt(uint32_t a, uint32_t b)
 {
@@ -109,8 +113,11 @@ static inline void tcp_flags_tx_count(uint8_t tcp_flags)
     }
 }
 
-inline struct rte_mbuf *tcp_new_packet(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
+inline struct rte_mbuf *tcp_new_packet(struct Socket *sk, uint8_t tcp_flags)
 {
+    // uint16_t csum_ip = 0;
+    uint16_t csum_tcp = 0;
+    TCP *tcp = (TCP *)sk->l4_protocol;
     uint16_t csum_ip = 0;
     uint16_t snd_seq = 0;
     struct rte_mbuf *m = NULL;
@@ -120,10 +127,14 @@ inline struct rte_mbuf *tcp_new_packet(TCP *tcp, struct Socket *sk, uint8_t tcp_
     if (tcp_flags & TH_SYN)
     {
         p = tcp->template_tcp_opt;
+        csum_tcp = tcp->csum_tcp_opt;
+        // csum_ip = tcp->csum_ip_opt;
     }
     else if (tcp_flags & TH_PUSH)
     {
         p = tcp->template_tcp_data;
+        csum_tcp = tcp->csum_tcp_data;
+        // csum_ip = tcp->csum_ip_data;
         snd_seq = p->data.data_len;
         if (tcp_flags & TH_URG)
         {
@@ -133,6 +144,8 @@ inline struct rte_mbuf *tcp_new_packet(TCP *tcp, struct Socket *sk, uint8_t tcp_
     else
     {
         p = tcp->template_tcp_pkt;
+        csum_tcp = tcp->csum_tcp;
+        // csum_ip = tcp->csum_ip;
     }
 
     m = mbuf_cache_alloc(p);
@@ -164,19 +177,22 @@ inline struct rte_mbuf *tcp_new_packet(TCP *tcp, struct Socket *sk, uint8_t tcp_
     /* we always send from <snd_una> */
     th->th_seq = htonl(tcp->snd_una);
     th->th_ack = htonl(tcp->rcv_nxt);
-    th->th_sum = csum_pseudo_ipv4(IPPROTO_TCP, sk->src_addr, sk->dst_addr, p->data.l4_len);
+    th->th_sum = csum_tcp;
 
     return m;
 }
 
-inline void tcp_send_packet(TCP *tcp, rte_mbuf *m, struct Socket *sk)
+inline void tcp_send_packet(rte_mbuf *m, struct Socket *sk)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     csum_offload_ip_tcpudp(m, RTE_MBUF_F_TX_TCP_CKSUM);
     dpdk_config_percore::cfg_send_packet(m);
 }
 
-static void tcp_socket_close(TCP *tcp, struct Socket *sk)
+static void tcp_socket_close(struct Socket *sk)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
+    unique_queue_del(&tcp->timer);
     if (tcp->state != TCP_CLOSE)
     {
         tcp->state = TCP_CLOSE;
@@ -186,8 +202,9 @@ static void tcp_socket_close(TCP *tcp, struct Socket *sk)
     }
 }
 
-static inline void tcp_process_rst(TCP *tcp, struct Socket *sk, struct rte_mbuf *m)
+static inline void tcp_process_rst(struct Socket *sk, struct rte_mbuf *m)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
 #ifdef DPERF_DEBUG
     if (sk->log)
     {
@@ -197,7 +214,7 @@ static inline void tcp_process_rst(TCP *tcp, struct Socket *sk, struct rte_mbuf 
 #endif
     if (tcp->state != TCP_CLOSE)
     {
-        tcp_socket_close(tcp, sk);
+        tcp_socket_close(sk);
     }
 
     mbuf_free2(m);
@@ -215,12 +232,13 @@ inline bool tcp_in_duration()
     }
 }
 
-static inline void tcp_send_keepalive_request(TCP *tcp, struct Socket *sk)
+static inline void tcp_send_keepalive_request(struct Socket *sk)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     if (tcp_in_duration())
     {
         tcp->keepalive_request_num++;
-        tcp_reply(tcp, sk, TH_ACK | TH_PUSH);
+        tcp_reply(sk, TH_ACK | TH_PUSH);
         if (unlikely((TCP::setted_keepalive_request_num > 0) && (tcp->keepalive_request_num >= TCP::setted_keepalive_request_num)))
         {
             tcp->keepalive = 0;
@@ -229,135 +247,94 @@ static inline void tcp_send_keepalive_request(TCP *tcp, struct Socket *sk)
     else
     {
         tcp->state = TCP_FIN_WAIT1;
-        tcp_reply(tcp, sk, TH_ACK | TH_FIN);
+        tcp_reply(sk, TH_ACK | TH_FIN);
         tcp->keepalive = 0;
     }
 }
 
-static inline int tcp_do_keepalive(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
+static inline void tcp_do_keepalive(struct Socket *sk)
 {
-    if (now_tsc < tcp->timer_tsc)
-    {
-        return -1;
-    }
-
-    if (!tcp->global_keepalive)
-    {
-        return -1;
-    }
-
+    TCP *tcp = (TCP *)sk->l4_protocol;
     if ((tcp->snd_nxt != tcp->snd_una) || (tcp->state != TCP_ESTABLISHED) || (tcp->keepalive == 0))
     {
         if (tcp->flood)
         {
             if (tcp_in_duration())
             {
-                tcp_reply(tcp, sk, TH_SYN);
+                tcp_reply(sk, TH_SYN);
                 tcp->snd_una = tcp->snd_nxt;
                 // socket_start_keepalive_timer(sk, work_space_tsc(ws));
-                tcp->timer_tsc = time_in_config();
-                return tcp->keepalive_request_interval;
+                tcp->timer.timer_tsc = time_in_config();
+                tcp_start_keepalive_timer(sk, time_in_config());
+                return;
             }
             else
             {
-                tcp_socket_close(tcp, sk);
+                tcp_socket_close(sk);
             }
         }
-        return -1;
+        return;
     }
 
     if (tcp->server == 0)
     {
-        tcp_send_keepalive_request(tcp, sk);
+        tcp_send_keepalive_request(sk);
     }
 
-    return -1;
+    return;
 }
 
-struct KeepAliveTimer : public Timer<KeepAliveTimer>
+struct KeepAliveTimerQueue : public UniqueTimerQueue
 {
-    Socket *sk;
-    FiveTuples ft;
-    KeepAliveTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc)
+    KeepAliveTimerQueue()
     {
-        if (sk)
-            ft = *sk;
+        unique_queue_init(this);
+        delay_tsc = TCP::keepalive_request_interval * (g_tsc_per_second / 1000);
     }
-    uint64_t delay_tsc() override
+    void callback(UniqueTimer *timer) override
     {
-        return TCP::keepalive_request_interval * (g_tsc_per_second / 1000);
+        tcp_do_keepalive((Socket*)timer->data);
     }
-    int callback() override
-    {
-        if (!TCP::checkvalid_socket_callback(ft, sk))
-        {
-            return -1;
-        }
-        TCP *tcp = (TCP *)sk->l4_protocol;
-        if (begin_tsc < tcp->timer_tsc)
-        {
-            return -1;
-        }
-        return tcp_do_keepalive(tcp, sk, time_in_config());
-    }
-};
+} keepalive_timer_queue;
 
-static inline int tcp_do_timeout(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
+static inline void tcp_do_timeout(struct Socket *sk)
 {
-    if (now_tsc < tcp->timer_tsc)
-    {
-        return -1;
-    }
+    TCP *tcp = (TCP *)sk->l4_protocol;
     net_stats_socket_error();
-    tcp_socket_close(tcp, sk);
-    return -1;
+    tcp_socket_close(sk);
+    return;
 }
 
-struct TimeoutTimer : public Timer<TimeoutTimer>
+struct TimeoutTimerQueue : public UniqueTimerQueue
 {
-    Socket *sk;
-    FiveTuples ft;
-    TimeoutTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc)
+    TimeoutTimerQueue()
     {
-        if (sk)
-            ft = *sk;
+        unique_queue_init(this);
+        delay_tsc = ((RETRANSMIT_TIMEOUT * RETRANSMIT_NUM_MAX) + TCP::keepalive_request_interval) * (g_tsc_per_second / 1000);
     }
-    uint64_t delay_tsc() override
+    void callback(UniqueTimer *timer) override
     {
-        return ((RETRANSMIT_TIMEOUT * RETRANSMIT_NUM_MAX) + TCP::keepalive_request_interval) * (g_tsc_per_second / 1000);
+        tcp_do_timeout((Socket*)timer->data);
     }
-    int callback() override
-    {
-        if (!TCP::checkvalid_socket_callback(ft, sk))
-        {
-            return -1;
-        }
-        TCP *tcp = (TCP *)sk->l4_protocol;
-        return tcp_do_timeout(tcp, sk, time_in_config());
-    }
-};
+} timeout_timer_queue;
 
-static inline int tcp_do_retransmit(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
+static inline void tcp_do_retransmit(struct Socket *sk)
 {
-    if (now_tsc < tcp->timer_tsc)
-    {
-        return -1;
-    }
-
+    TCP *tcp = (TCP *)sk->l4_protocol;
     uint32_t snd_nxt = 0;
     uint8_t flags = 0;
 
     if (tcp->snd_nxt == tcp->snd_una)
     {
         tcp->retrans = 0;
-        return -1;
+        return;
     }
 
     /* rss auto: this socket is closed by another worker */
-    if (unlikely(sk->src_addr == ipaddr_t(0)))
+    if (unlikely(sk->src_addr == ip4addr_t(0)))
     {
-        tcp_socket_close(tcp, sk);
-        return -1;
+        tcp_socket_close(sk);
+        return;
     }
 
     tcp->retrans++;
@@ -370,17 +347,16 @@ static inline int tcp_do_retransmit(TCP *tcp, struct Socket *sk, uint64_t now_ts
         {
             snd_nxt = tcp->snd_nxt;
             tcp->snd_nxt = tcp->snd_una;
-            tcp_reply(tcp, sk, TH_PUSH | TH_ACK);
+            tcp_reply(sk, TH_PUSH | TH_ACK);
             tcp->snd_nxt = snd_nxt;
             ((HTTP *)sk->l5_protocol)->snd_window = 1;
             // net_stats_push_rt();
-            tcp->timer_tsc = time_in_config();
-            net_stats_push_rt();
-            return RETRANSMIT_TIMEOUT;
+            tcp->timer.timer_tsc = time_in_config();
+            tcp_start_retransmit_timer(sk, time_in_config());
         }
         else
         {
-            tcp_reply(tcp, sk, flags);
+            tcp_reply(sk, flags);
         }
         if (flags & TH_SYN)
         {
@@ -398,94 +374,67 @@ static inline int tcp_do_retransmit(TCP *tcp, struct Socket *sk, uint64_t now_ts
         {
             net_stats_ack_rt();
         }
-        return -1;
+        return;
     }
     else
     {
         // SOCKET_LOG(sk, "err-socket");
         net_stats_socket_error();
-        tcp_socket_close(tcp, sk);
-        return -1;
+        tcp_socket_close(sk);
+        return;
     }
-    return -1;
+    return;
 }
 
-struct RetransmitTimer : public Timer<RetransmitTimer>
+struct RetransmitTimerQueue : public UniqueTimerQueue
 {
     Socket *sk;
     FiveTuples ft;
-    RetransmitTimer(Socket *sk, uint64_t now_tsc) : sk(sk), Timer(now_tsc)
+    RetransmitTimerQueue()
     {
-        if (sk)
-            ft = *sk;
+        unique_queue_init(this);
+        delay_tsc = RETRANSMIT_TIMEOUT * (g_tsc_per_second / 1000);
     }
-    uint64_t delay_tsc() override
+    void callback(UniqueTimer *timer) override
     {
-        return RETRANSMIT_TIMEOUT * (g_tsc_per_second / 1000);
+        return tcp_do_retransmit((Socket*)timer->data);
     }
-    int callback() override
-    {
-        if (!TCP::checkvalid_socket_callback(ft, sk))
-        {
-            return -1;
-        }
-        TCP *tcp = (TCP *)sk->l4_protocol;
-        if (begin_tsc < tcp->timer_tsc)
-        {
-            return -1;
-        }
-        return tcp_do_retransmit(tcp, sk, time_in_config());
-    }
-};
+} retransmit_timer_queue;
 
-static inline void tcp_start_retransmit_timer(TCP *tcp, Socket *sk, uint64_t now_tsc)
+inline void tcp_start_retransmit_timer(Socket *sk, uint64_t now_tsc)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     if (tcp->snd_nxt != tcp->snd_una)
     {
-        tcp->timer_tsc = now_tsc;
-        TIMERS.add_job(new RetransmitTimer(sk, now_tsc), now_tsc);
+        unique_queue_add(&retransmit_timer_queue, &tcp->timer, now_tsc);
     }
 }
 
-static inline void tcp_start_timeout_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
+inline void tcp_start_timeout_timer(struct Socket *sk, uint64_t now_tsc)
 {
-    tcp->timer_tsc = now_tsc;
-    TIMERS.add_job(new TimeoutTimer(sk, now_tsc), now_tsc);
+    TCP *tcp = (TCP *)sk->l4_protocol;
+    unique_queue_add(&timeout_timer_queue, &tcp->timer, now_tsc);
 }
 
-void tcp_start_keepalive_timer(TCP *tcp, struct Socket *sk, uint64_t now_tsc)
+void tcp_start_keepalive_timer(struct Socket *sk, uint64_t now_tsc)
 {
-    if (tcp->keepalive && (tcp->snd_nxt == tcp->snd_una))
+    TCP *tcp = (TCP *)sk->l4_protocol;
+    if (TCP::global_keepalive && tcp->keepalive && (tcp->snd_nxt == tcp->snd_una))
     {
-        tcp->timer_tsc = now_tsc;
-        TIMERS.add_job(new KeepAliveTimer(sk, now_tsc), now_tsc);
+        unique_queue_add(&keepalive_timer_queue, &tcp->timer, now_tsc);
     }
 }
 
 void TCP::timer_init()
 {
-    TIMERS.add_timers(SpecificTimers(new KeepAliveTimer(NULL, 0)));
-    TIMERS.add_timers(SpecificTimers(new RetransmitTimer(NULL, 0)));
-    TIMERS.add_timers(SpecificTimers(new TimeoutTimer(NULL, 0)));
+    TIMERS.add_queue(&keepalive_timer_queue);
+    TIMERS.add_queue(&timeout_timer_queue);
+    TIMERS.add_queue(&retransmit_timer_queue);
 }
 
-inline uint64_t tcp_accurate_timer_tsc(TCP *tcp, uint64_t now_tsc)
+struct rte_mbuf *tcp_reply(struct Socket *sk, uint8_t tcp_flags)
 {
-    uint64_t interval = TCP::keepalive_request_interval;
-    /*
-     * |-------------|-------------|-------------|
-     * timer_tsc     |--|now_tsc
-     * */
-    if (((tcp->timer_tsc + interval) < now_tsc) && ((tcp->timer_tsc + 2 * interval) > now_tsc))
-    {
-        now_tsc = tcp->timer_tsc + interval;
-    }
-
-    return now_tsc;
-}
-
-struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
-{
+    TCP *tcp = (TCP *)sk->l4_protocol;
     struct rte_mbuf *m = NULL;
     uint64_t now_tsc = 0;
     now_tsc = time_in_config();
@@ -510,10 +459,10 @@ struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
         }
     }
 
-    m = tcp_new_packet(tcp, sk, tcp_flags);
+    m = tcp_new_packet(sk, tcp_flags);
     if (m)
     {
-        tcp_send_packet(tcp, m, sk);
+        tcp_send_packet(m, sk);
     }
 
     if (tcp->state != TCP_CLOSE)
@@ -527,12 +476,12 @@ struct rte_mbuf *tcp_reply(TCP *tcp, struct Socket *sk, uint8_t tcp_flags)
             }
             if (tcp->send_window == 0)
             {
-                tcp_start_retransmit_timer(tcp, sk, now_tsc);
+                tcp_start_retransmit_timer(sk, now_tsc);
             }
         }
         else if (tcp->server && (tcp->send_window == 0))
         {
-            tcp_start_timeout_timer(tcp, sk, now_tsc);
+            tcp_start_timeout_timer(sk, now_tsc);
         }
     }
 
@@ -587,8 +536,9 @@ static void tcp_rst_set_ip(struct iphdr *iph)
     iph->daddr = htonl(daddr);
 }
 
-inline void tcp_reply_rst(TCP *tcp, Socket *sk, struct ether_header *eth, struct iphdr *iph, struct tcphdr *th, rte_mbuf *m, int olen)
+inline void tcp_reply_rst(Socket *sk, struct ether_header *eth, struct iphdr *iph, struct tcphdr *th, rte_mbuf *m, int olen)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     int nlen = 0;
 
     /* not support rst yet */
@@ -618,7 +568,7 @@ inline void tcp_reply_rst(TCP *tcp, Socket *sk, struct ether_header *eth, struct
         rte_pktmbuf_trim(m, olen - nlen);
     }
     net_stats_rst_tx();
-    tcp_send_packet(tcp, m, sk);
+    tcp_send_packet(m, sk);
 }
 static inline uint8_t *tcp_data_get(struct iphdr *iph, struct tcphdr *th, uint16_t *data_len)
 {
@@ -650,10 +600,14 @@ static inline uint8_t *tcp_data_get(struct iphdr *iph, struct tcphdr *th, uint16
 inline void tcp_stop_retransmit_timer(TCP *tcp)
 {
     tcp->retrans = 0;
+    if (tcp->snd_nxt == tcp->snd_una) {
+        unique_queue_del(&tcp->timer);
+    }
 }
 
-static inline void tcp_reply_more(struct TCP *tcp, struct Socket *sk)
+static inline void tcp_reply_more(struct Socket *sk)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     int i = 0;
     uint32_t snd_una = tcp->snd_una;
     uint32_t snd_max = ((HTTP *)sk->l5_protocol)->snd_max;
@@ -663,7 +617,7 @@ static inline void tcp_reply_more(struct TCP *tcp, struct Socket *sk)
     while (tcp_seq_lt(tcp->snd_nxt, snd_wnd) && tcp_seq_lt(tcp->snd_nxt, snd_max) && (i < ((HTTP *)(sk->l5_protocol))->snd_window))
     {
         tcp->snd_una = tcp->snd_nxt;
-        tcp_reply(tcp, sk, TH_PUSH | TH_ACK | TH_URG);
+        tcp_reply(sk, TH_PUSH | TH_ACK | TH_URG);
         i++;
     }
 
@@ -672,18 +626,19 @@ static inline void tcp_reply_more(struct TCP *tcp, struct Socket *sk)
     {
         if (tcp->keepalive)
         {
-            tcp_start_timeout_timer(tcp, sk, time_in_config());
+            tcp_start_timeout_timer(sk, time_in_config());
         }
         else
         {
             tcp->state = TCP_FIN_WAIT1;
-            tcp_reply(tcp, sk, TH_FIN | TH_ACK);
+            tcp_reply(sk, TH_FIN | TH_ACK);
         }
     }
 }
 
-static inline bool tcp_check_sequence(struct TCP *tcp, struct Socket *sk, struct tcphdr *th, uint16_t data_len)
+static inline bool tcp_check_sequence(struct Socket *sk, struct tcphdr *th, uint16_t data_len)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     uint32_t ack = ntohl(th->th_ack);
     uint32_t seq = ntohl(th->th_seq);
     uint32_t snd_last = tcp->snd_una;
@@ -769,7 +724,7 @@ static inline bool tcp_check_sequence(struct TCP *tcp, struct Socket *sk, struct
 
                 snd_nxt = tcp->snd_nxt;
                 tcp->snd_nxt = ack;
-                tcp_reply(tcp, sk, TH_PUSH | TH_ACK);
+                tcp_reply(sk, TH_PUSH | TH_ACK);
                 tcp->snd_nxt = snd_nxt;
                 tcp->retrans = 0;
                 ((HTTP *)(sk->l5_protocol))->snd_window = 1;
@@ -784,9 +739,9 @@ static inline bool tcp_check_sequence(struct TCP *tcp, struct Socket *sk, struct
         else
         {
             /* fast retransmit : If the last transmission time is more than 1 second */
-            if ((tcp->timer_tsc + TSC_PER_SEC) < time_in_config())
+            if ((tcp->timer.timer_tsc + TSC_PER_SEC) < time_in_config())
             {
-                tcp_do_retransmit(tcp, sk, time_in_config());
+                tcp_do_retransmit(sk);
             }
         }
     }
@@ -795,7 +750,7 @@ static inline bool tcp_check_sequence(struct TCP *tcp, struct Socket *sk, struct
         /* lost ack */
         if (tcp_seq_le(seq, tcp->rcv_nxt))
         {
-            tcp_reply(tcp, sk, TH_ACK);
+            tcp_reply(sk, TH_ACK);
             net_stats_ack_rt();
         }
     }
@@ -803,8 +758,9 @@ static inline bool tcp_check_sequence(struct TCP *tcp, struct Socket *sk, struct
     return false;
 }
 
-inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rte_mbuf *m, struct tcphdr *th)
+inline void tcp_server_process_syn(struct Socket *sk, struct rte_mbuf *m, struct tcphdr *th)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     /* fast recycle */
     if (tcp->state == TCP_TIME_WAIT)
     {
@@ -825,7 +781,7 @@ inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rt
         tcp->snd_una = tcp->snd_nxt;
         ((HTTP *)(sk->l5_protocol))->snd_window = 1;
         tcp->rcv_nxt = ntohl(th->th_seq) + 1;
-        tcp_reply(tcp, sk, TH_SYN | TH_ACK);
+        tcp_reply(sk, TH_SYN | TH_ACK);
     }
     else if (tcp->state == TCP_SYN_RECV)
     {
@@ -833,9 +789,9 @@ inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rt
         // SOCKET_LOG_ENABLE(sk);
         // MBUF_LOG(m, "syn-ack-lost");
         // SOCKET_LOG(sk, "syn-ack-lost");
-        if ((tcp->timer_tsc + MS_PER_SEC) < time_in_config())
+        if ((tcp->timer.timer_tsc + MS_PER_SEC) < time_in_config())
         {
-            tcp_reply(tcp, sk, TH_SYN | TH_ACK);
+            tcp_reply(sk, TH_SYN | TH_ACK);
             net_stats_syn_rt();
         }
     }
@@ -851,9 +807,10 @@ inline void tcp_server_process_syn(struct TCP *tcp, struct Socket *sk, struct rt
     mbuf_free2(m);
 }
 
-inline void tcp_client_process_syn_ack(struct TCP *tcp, struct Socket *sk,
+inline void tcp_client_process_syn_ack(struct Socket *sk,
                                        struct rte_mbuf *m, struct tcphdr *th)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     uint32_t ack = ntohl(th->th_ack);
     uint32_t seq = htonl(th->th_seq);
 
@@ -873,7 +830,7 @@ inline void tcp_client_process_syn_ack(struct TCP *tcp, struct Socket *sk,
         tcp->rcv_nxt = seq + 1;
         tcp->snd_una = ack;
         tcp->state = TCP_ESTABLISHED;
-        tcp_reply(tcp, sk, TH_ACK | TH_PUSH);
+        tcp_reply(sk, TH_ACK | TH_PUSH);
     }
     else if (tcp->state == TCP_ESTABLISHED)
     {
@@ -881,7 +838,7 @@ inline void tcp_client_process_syn_ack(struct TCP *tcp, struct Socket *sk,
         net_stats_pkt_lost();
         if ((ack == tcp->snd_nxt) && ((seq + 1) == tcp->rcv_nxt))
         {
-            tcp_reply(tcp, sk, TH_ACK);
+            tcp_reply(sk, TH_ACK);
             net_stats_ack_rt();
         }
     }
@@ -896,8 +853,9 @@ inline void tcp_client_process_syn_ack(struct TCP *tcp, struct Socket *sk,
     mbuf_free2(m);
 }
 
-inline uint8_t tcp_process_fin(TCP *tcp, struct Socket *sk, uint8_t rx_flags, uint8_t tx_flags)
+inline uint8_t tcp_process_fin(struct Socket *sk, uint8_t rx_flags, uint8_t tx_flags)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     uint8_t flags = 0;
 
     switch (tcp->state)
@@ -954,9 +912,10 @@ inline uint8_t tcp_process_fin(TCP *tcp, struct Socket *sk, uint8_t rx_flags, ui
     return tx_flags | flags;
 }
 
-static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, struct rte_mbuf *m,
+static inline void tcp_server_process_data(struct Socket *sk, struct rte_mbuf *m,
                                            struct iphdr *iph, struct tcphdr *th)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     uint8_t *data = NULL;
     uint8_t tx_flags = 0;
     uint8_t rx_flags = th->th_flags;
@@ -970,7 +929,7 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
     }
 
     data = tcp_data_get(iph, th, &data_len);
-    if (tcp_check_sequence(tcp, sk, th, data_len) == false)
+    if (tcp_check_sequence(sk, th, data_len) == false)
     {
         // SOCKET_LOG_ENABLE(sk);
         MBUF_LOG(m, "drop-bad-seq");
@@ -997,15 +956,15 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
                 net_stats_http_2xx();
                 if (tcp->keepalive_request_num)
                 {
-                    tcp_reply_more(tcp, sk);
+                    tcp_reply_more(sk);
                 }
                 else
                 {
                     /* slow start */
-                    tcp_reply(tcp, sk, TH_PUSH | TH_ACK);
+                    tcp_reply(sk, TH_PUSH | TH_ACK);
                     tcp->keepalive_request_num = 1;
                 }
-                tcp_start_retransmit_timer(tcp, sk, time_in_config());
+                tcp_start_retransmit_timer(sk, time_in_config());
                 mbuf_free2(m);
                 return;
             }
@@ -1020,7 +979,7 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
         }
         else if ((tcp->send_window) && ((rx_flags & TH_FIN) == 0))
         {
-            tcp_reply_more(tcp, sk);
+            tcp_reply_more(sk);
             mbuf_free2(m);
             return;
         }
@@ -1028,43 +987,42 @@ static inline void tcp_server_process_data(struct TCP *tcp, struct Socket *sk, s
 
     if (tcp_state_after_established(tcp->state) || ((rx_flags | tx_flags) & TH_FIN))
     {
-        tx_flags = tcp_process_fin(tcp, sk, rx_flags, tx_flags);
+        tx_flags = tcp_process_fin(sk, rx_flags, tx_flags);
     }
 
     if (tx_flags != 0)
     {
-        tcp_reply(tcp, sk, tx_flags);
+        tcp_reply(sk, tx_flags);
     }
     else if (tcp->state != TCP_CLOSE)
     {
-        tcp_start_timeout_timer(tcp, sk, time_in_config());
+        tcp_start_timeout_timer(sk, time_in_config());
     }
 
     if (close_after_process_fin)
     {
-        tcp_socket_close(tcp, sk);
+        tcp_socket_close(sk);
     }
 
     mbuf_free2(m);
 }
 
-inline void tcp_server_process(TCP *tcp, Socket *sk, ether_header *eth_hdr, iphdr *ip_hdr, tcphdr *tcp_hdr, rte_mbuf *data, int olen)
+inline void tcp_server_process(Socket *sk, ether_header *eth_hdr, iphdr *ip_hdr, tcphdr *tcp_hdr, rte_mbuf *data, int olen)
 {
-
     uint8_t flags = tcp_hdr->th_flags;
     tcp_flags_rx_count(flags);
 
     if (((flags & (TH_SYN | TH_RST)) == 0) && (flags & TH_ACK))
     {
-        tcp_server_process_data(tcp, sk, data, ip_hdr, tcp_hdr);
+        tcp_server_process_data(sk, data, ip_hdr, tcp_hdr);
     }
     else if (flags == TH_SYN)
     {
-        tcp_server_process_syn(tcp, sk, data, tcp_hdr);
+        tcp_server_process_syn(sk, data, tcp_hdr);
     }
     else if (flags & TH_RST)
     {
-        tcp_process_rst(tcp, sk, data);
+        tcp_process_rst(sk, data);
     }
     else
     {
@@ -1075,16 +1033,17 @@ inline void tcp_server_process(TCP *tcp, Socket *sk, ether_header *eth_hdr, iphd
     }
 }
 
-static inline void tcp_client_process_data(struct TCP *tcp, struct Socket *sk, struct rte_mbuf *m,
+static inline void tcp_client_process_data(struct Socket *sk, struct rte_mbuf *m,
                                            struct iphdr *iph, struct tcphdr *th)
 {
+    TCP *tcp = (TCP *)sk->l4_protocol;
     uint8_t *data = NULL;
     uint8_t tx_flags = 0;
     uint8_t rx_flags = th->th_flags;
     uint16_t data_len = 0;
 
     data = tcp_data_get(iph, th, &data_len);
-    if (tcp_check_sequence(tcp, sk, th, data_len) == false)
+    if (tcp_check_sequence(sk, th, data_len) == false)
     {
         // SOCKET_LOG_ENABLE(sk);
         // MBUF_LOG(m, "drop-bad-seq");
@@ -1116,11 +1075,11 @@ static inline void tcp_client_process_data(struct TCP *tcp, struct Socket *sk, s
                 {
                     if (tcp->keepalive_request_interval)
                     {
-                        tcp_start_keepalive_timer(tcp, sk, tcp->timer_tsc);
+                        tcp_start_keepalive_timer(sk, tcp->timer.timer_tsc);
                     }
                     else
                     {
-                        tcp_send_keepalive_request(tcp, sk);
+                        tcp_send_keepalive_request(sk);
                     }
                 }
             }
@@ -1129,7 +1088,7 @@ static inline void tcp_client_process_data(struct TCP *tcp, struct Socket *sk, s
 
     if (tcp_state_after_established(tcp->state) || ((rx_flags | tx_flags) & TH_FIN))
     {
-        tx_flags = tcp_process_fin(tcp, sk, rx_flags, tx_flags);
+        tx_flags = tcp_process_fin(sk, rx_flags, tx_flags);
     }
 
     if (tx_flags != 0)
@@ -1137,34 +1096,33 @@ static inline void tcp_client_process_data(struct TCP *tcp, struct Socket *sk, s
         /* delay ack */
         if ((rx_flags & TH_FIN) || (tx_flags != TH_ACK) || (tcp->keepalive == 0) || (tcp->keepalive && (tcp->keepalive_request_interval >= RETRANSMIT_TIMEOUT)))
         {
-            tcp_reply(tcp, sk, tx_flags);
+            tcp_reply(sk, tx_flags);
         }
     }
 
     if (close_after_process_fin)
     {
-        tcp_socket_close(tcp, sk);
+        tcp_socket_close(sk);
     }
 
     mbuf_free2(m);
 }
 
-inline void tcp_client_process(TCP *tcp, Socket *sk, ether_header *eth_hdr, iphdr *ip_hdr, tcphdr *tcp_hdr, rte_mbuf *data, int olen)
+inline void tcp_client_process(Socket *sk, ether_header *eth_hdr, iphdr *ip_hdr, tcphdr *tcp_hdr, rte_mbuf *data, int olen)
 {
-
     uint8_t flags = tcp_hdr->th_flags;
 
     if (((flags & (TH_SYN | TH_RST)) == 0) && (flags & TH_ACK))
     {
-        tcp_client_process_data(tcp, sk, data, ip_hdr, tcp_hdr);
+        tcp_client_process_data(sk, data, ip_hdr, tcp_hdr);
     }
     else if (flags == (TH_SYN | TH_ACK))
     {
-        tcp_client_process_syn_ack(tcp, sk, data, tcp_hdr);
+        tcp_client_process_syn_ack(sk, data, tcp_hdr);
     }
     else if (flags & TH_RST)
     {
-        tcp_process_rst(tcp, sk, data);
+        tcp_process_rst(sk, data);
     }
     else
     {
@@ -1193,7 +1151,7 @@ int TCP::process(Socket *sk, rte_mbuf *data)
     {
         if (TCP::global_tcp_rst)
         {
-            tcp_reply_rst(tcp, sk, eth_hdr, ip_hdr, tcp_hdr, data, olen);
+            tcp_reply_rst(sk, eth_hdr, ip_hdr, tcp_hdr, data, olen);
         }
         else
         {
@@ -1205,11 +1163,11 @@ int TCP::process(Socket *sk, rte_mbuf *data)
 
     if (tcp->server)
     {
-        tcp_server_process(tcp, sk, eth_hdr, ip_hdr, tcp_hdr, data, olen);
+        tcp_server_process(sk, eth_hdr, ip_hdr, tcp_hdr, data, olen);
     }
     else
     {
-        tcp_client_process(tcp, sk, eth_hdr, ip_hdr, tcp_hdr, data, olen);
+        tcp_client_process(sk, eth_hdr, ip_hdr, tcp_hdr, data, olen);
     }
     return 0;
 }
@@ -1225,6 +1183,7 @@ Socket *tcp_new_socket(const Socket *template_socket)
 
 void tcp_release_socket(Socket *socket)
 {
+    TCP *tcp = (TCP *)socket->l4_protocol;
     delete (TCP *)socket->l4_protocol;
     delete (HTTP *)socket->l5_protocol;
     delete socket;
@@ -1233,18 +1192,32 @@ void tcp_release_socket(Socket *socket)
 void tcp_validate_socket(Socket *socket)
 {
     TCP *tcp = (TCP *)socket->l4_protocol;
-    tcp->timer_tsc = time_in_config();
+    tcp->timer.timer_tsc = time_in_config();
+    tcp->timer.data = socket;
+    unique_timer_init(&tcp->timer);
     tcp->snd_nxt = rand_();
     tcp->snd_una = tcp->snd_nxt;
+}
+
+void tcp_validate_csum(Socket *socket)
+{
+    TCP *tcp = (TCP *)socket->l4_protocol;
+    tcp->csum_tcp = csum_pseudo_ipv4(IPPROTO_TCP, socket->src_addr, socket->dst_addr, TCP::template_tcp_pkt->data.l4_len);
+    tcp->csum_tcp_data = csum_pseudo_ipv4(IPPROTO_TCP, socket->src_addr, socket->dst_addr, TCP::template_tcp_data->data.l4_len);
+    tcp->csum_tcp_opt = csum_pseudo_ipv4(IPPROTO_TCP, socket->src_addr, socket->dst_addr, TCP::template_tcp_opt->data.l4_len);
+}
+
+void tcp_validate_csum_opt(Socket *socket)
+{
+    TCP *tcp = (TCP *)socket->l4_protocol;
+    tcp->csum_tcp_opt = csum_pseudo_ipv4(IPPROTO_TCP, socket->src_addr, socket->dst_addr, TCP::template_tcp_opt->data.l4_len);
 }
 
 void tcp_launch(Socket *socket)
 {
     TCP *tcp = (TCP *)socket->l4_protocol;
-    tcp->timer_tsc = time_in_config();
-    tcp->snd_nxt = rand_();
-    tcp->snd_una = tcp->snd_nxt;
+    tcp_validate_socket(socket);
     tcp->state = TCP_SYN_SENT;
-    tcp_reply(tcp, socket, TH_SYN);
+    tcp_reply(socket, TH_SYN);
     net_stats_socket_open();
 }

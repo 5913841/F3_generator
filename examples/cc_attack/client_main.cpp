@@ -30,7 +30,7 @@ mbuf_cache *template_tcp_pkt = new mbuf_cache();
 const char *data;
 SocketPointerTable *socket_table = new SocketPointerTable();
 
-ipaddr_t target_ip("10.233.1.1");
+ip4addr_t target_ip("10.233.1.1");
 
 dpdk_config_user usrconfig = {
     .lcores = {0},
@@ -81,7 +81,6 @@ void config_tcp_variables()
     TCP::use_http = true;
     TCP::global_mss = MSS_IPV4;
     data = TCP::server ? http_get_response() : http_get_request();
-    template_tcp->timer_tsc = 0;
     template_tcp->retrans = 0;
     template_tcp->keepalive_request_num = 0;
     template_tcp->keepalive = TCP::global_keepalive;
@@ -131,8 +130,8 @@ void config_template_pkt()
 
 void init_sockets()
 {
-    ipaddr_t base_src = ipaddr_t("10.233.1.0");
-    ipaddr_t base_dst = ipaddr_t("10.234.1.0");
+    ip4addr_t base_src = ip4addr_t("10.233.1.0");
+    ip4addr_t base_dst = ip4addr_t("10.234.1.0");
     srand_(2024);
     for(int i = 0; i < 5000000; i++)
     {
@@ -141,6 +140,7 @@ void init_sockets()
         socket->src_port = rand_();
         socket->src_addr = rand_() % 256 + base_src;
         socket->dst_addr = rand_() % 256 + base_dst;
+        tcp_validate_csum(socket);
         if (socket_table->insert_socket(socket) == -1)
         {
             tcp_release_socket(socket);

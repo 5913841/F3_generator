@@ -43,6 +43,10 @@ public:
     {
         return sizeof(struct ether_header);
     }
+    size_t hash() override
+    {
+        return std::hash<uint8_t>()(PTC_ETH);
+    }
     int construct(Socket *socket, rte_mbuf *data) override
     {
         ether_header *eth = decode_hdr_pre(data);

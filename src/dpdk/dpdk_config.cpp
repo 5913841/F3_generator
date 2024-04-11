@@ -1,6 +1,6 @@
 #include "dpdk/dpdk_config.h"
 #include "panel/panel.h"
-#include "timer/timer.h"
+#include "timer/clock.h"
 
 thread_local dpdk_config_percore *g_config_percore;
 dpdk_config *g_config;
@@ -64,26 +64,26 @@ dpdk_config_percore::dpdk_config_percore(dpdk_config *config)
     rq->rx_burst = config->rx_burst_size;
 }
 
-bool dpdk_config_percore::check_epoch_timer(uint64_t gap_tsc)
-{
-    tick_time_update(&g_config_percore->time);
-    CPULOAD_ADD_TSC(&g_config_percore->cpusage, time_in_config(), g_config_percore->epoch_work);
+// bool dpdk_config_percore::check_epoch_timer(uint64_t gap_tsc)
+// {
+//     tick_time_update(&g_config_percore->time);
+//     CPULOAD_ADD_TSC(&g_config_percore->cpusage, time_in_config(), g_config_percore->epoch_work);
 
-    if (unlikely(tsc_time_go(&g_config_percore->time.second, time_in_config())))
-    {
-        net_stats_timer_handler();
-        net_stats_print_speed(0, g_config_percore->time.second.count);
-    }
+//     if (unlikely(tsc_time_go(&g_config_percore->time.second, time_in_config())))
+//     {
+//         net_stats_timer_handler();
+//         net_stats_print_speed(0, g_config_percore->time.second.count);
+//     }
 
-    if (unlikely(time_in_config() - g_config_percore->epoch_last_tsc >= gap_tsc))
-    {
-        g_config_percore->epoch_work += 1;
-        g_config_percore->epoch_last_tsc = time_in_config();
-        return true;
-    }
+//     if (unlikely(time_in_config() - g_config_percore->epoch_last_tsc >= gap_tsc))
+//     {
+//         g_config_percore->epoch_work += 1;
+//         g_config_percore->epoch_last_tsc = time_in_config();
+//         return true;
+//     }
 
-    return false;
-}
+//     return false;
+// }
 
 uint64_t& time_in_config() {
     if(g_config->always_accurate_time) 

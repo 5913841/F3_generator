@@ -1,5 +1,10 @@
 #include "socket/socket.h"
-#include <hash_map>
+
+ipaddr_t::ipaddr_t(const ip4addr_t& other)
+{
+    ip = other.ip;
+}
+
 bool FiveTuples::operator==(const FiveTuples &other) const
 {
     // return likely(src_addr == other.src_addr &&
@@ -57,14 +62,8 @@ FiveTuples::FiveTuples(const Socket &socket)
 size_t FiveTuples::hash(const FiveTuples &ft)
 {
     size_t hash_value = 0x12345678;
-    hash_value += std::hash<uint32_t>()(ft.src_addr.in6.s6_addr32[0]);
-    hash_value += std::hash<uint32_t>()(ft.src_addr.in6.s6_addr32[1]);
-    hash_value += std::hash<uint32_t>()(ft.src_addr.in6.s6_addr32[2]);
-    hash_value += std::hash<uint32_t>()(ft.src_addr.in6.s6_addr32[3]);
-    hash_value += std::hash<uint32_t>()(ft.dst_addr.in6.s6_addr32[0]);
-    hash_value += std::hash<uint32_t>()(ft.dst_addr.in6.s6_addr32[1]);
-    hash_value += std::hash<uint32_t>()(ft.dst_addr.in6.s6_addr32[2]);
-    hash_value += std::hash<uint32_t>()(ft.dst_addr.in6.s6_addr32[3]);
+    hash_value += std::hash<uint32_t>()(ft.src_addr.ip.s_addr);
+    hash_value += std::hash<uint32_t>()(ft.dst_addr.ip.s_addr);
     hash_value += std::hash<uint16_t>()(ft.src_port);
     hash_value += std::hash<uint16_t>()(ft.dst_port);
     for (int i = 0; i < 4; i++)
@@ -78,19 +77,13 @@ size_t Socket::hash(const Socket* sk)
 {
     size_t hash_value = 0x12345678;
     if (sk) {
-        hash_value += std::hash<uint32_t>()(sk->src_addr.in6.s6_addr32[0]);
-        hash_value += std::hash<uint32_t>()(sk->src_addr.in6.s6_addr32[1]);
-        hash_value += std::hash<uint32_t>()(sk->src_addr.in6.s6_addr32[2]);
-        hash_value += std::hash<uint32_t>()(sk->src_addr.in6.s6_addr32[3]);
-        hash_value += std::hash<uint32_t>()(sk->dst_addr.in6.s6_addr32[0]);
-        hash_value += std::hash<uint32_t>()(sk->dst_addr.in6.s6_addr32[1]);
-        hash_value += std::hash<uint32_t>()(sk->dst_addr.in6.s6_addr32[2]);
-        hash_value += std::hash<uint32_t>()(sk->dst_addr.in6.s6_addr32[3]);
+        hash_value += std::hash<uint32_t>()(sk->src_addr.ip.s_addr);
+        hash_value += std::hash<uint32_t>()(sk->dst_addr.ip.s_addr);
         hash_value += std::hash<uint16_t>()(sk->src_port);
         hash_value += std::hash<uint16_t>()(sk->dst_port);
         for (int i = 0; i < 4; i++)
         {
-            hash_value += std::hash<uint8_t>()(sk->protocols[i]->name());
+            hash_value += sk->protocols[i]->hash();
         }
     }
     return hash_value;
@@ -100,19 +93,13 @@ size_t Socket::hash(const Socket* sk)
 size_t Socket::hash(const Socket &sk)
 {
     size_t hash_value = 0x12345678;
-    hash_value += std::hash<uint32_t>()(sk.src_addr.in6.s6_addr32[0]);
-    hash_value += std::hash<uint32_t>()(sk.src_addr.in6.s6_addr32[1]);
-    hash_value += std::hash<uint32_t>()(sk.src_addr.in6.s6_addr32[2]);
-    hash_value += std::hash<uint32_t>()(sk.src_addr.in6.s6_addr32[3]);
-    hash_value += std::hash<uint32_t>()(sk.dst_addr.in6.s6_addr32[0]);
-    hash_value += std::hash<uint32_t>()(sk.dst_addr.in6.s6_addr32[1]);
-    hash_value += std::hash<uint32_t>()(sk.dst_addr.in6.s6_addr32[2]);
-    hash_value += std::hash<uint32_t>()(sk.dst_addr.in6.s6_addr32[3]);
+    hash_value += std::hash<uint32_t>()(sk.src_addr.ip.s_addr);
+    hash_value += std::hash<uint32_t>()(sk.dst_addr.ip.s_addr);
     hash_value += std::hash<uint16_t>()(sk.src_port);
     hash_value += std::hash<uint16_t>()(sk.dst_port);
     for (int i = 0; i < 4; i++)
     {
-        hash_value += std::hash<uint8_t>()(sk.protocols[i]->name());
+        hash_value += sk.protocols[i]->hash();
     }
     return hash_value;
 }

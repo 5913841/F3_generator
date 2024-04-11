@@ -1,8 +1,10 @@
 *
 !examples
 !src
-!examples/
-!src/
+!examples/*
+!src/*
+!examples/**
+!src/**
 !dumpcap
 !*.sh
 !.gitignore

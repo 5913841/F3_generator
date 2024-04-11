@@ -76,7 +76,7 @@ int http_ack_delay_flush()
             http->http_ack = 0;
             if (tcp->state == TCP_ESTABLISHED)
             {
-                tcp_reply(tcp, sk, TH_ACK);
+                tcp_reply(sk, TH_ACK);
             }
         }
     }

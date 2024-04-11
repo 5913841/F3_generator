@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <string.h>
-#include "timer/timer.h"
+#include "timer/clock.h"
 #include "protocols/TCP.h"
 #include "dpdk/dpdk_config.h"
 

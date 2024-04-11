@@ -48,6 +48,7 @@ public:
     virtual ProtocolCode name(){ return PTC_NONE; }
     virtual int construct(Socket *socket, rte_mbuf *data) = 0;
     virtual size_t get_hdr_len(Socket *socket, rte_mbuf *data) = 0;
+    virtual size_t hash() = 0;
 };
 
 class NamedProtocol : public Protocol
@@ -58,6 +59,7 @@ public:
     virtual ProtocolCode name() override { return code_; }
     virtual int construct(Socket *socket, rte_mbuf *data) {return 0;};
     virtual size_t get_hdr_len(Socket *socket, rte_mbuf *data) {return 0;};
+    virtual size_t hash() override {return std::hash<uint8_t>()(code_);};
 };
 
 class L2_Protocol : public Protocol

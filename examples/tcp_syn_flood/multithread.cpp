@@ -26,7 +26,7 @@ mbuf_cache *template_tcp_data = new mbuf_cache();
 mbuf_cache *template_tcp_opt = new mbuf_cache();
 mbuf_cache *template_tcp_pkt = new mbuf_cache();
 
-ipaddr_t target_ip("10.233.1.1");
+ip4addr_t target_ip("10.233.1.1");
 
 dpdk_config_user usrconfig = {
     .lcores = {0},
@@ -72,7 +72,6 @@ void config_tcp_variables()
     TCP::tos = 0x00;
     TCP::use_http = true;
     TCP::global_mss = MSS_IPV4;
-    template_tcp->timer_tsc = 0;
     template_tcp->retrans = 0;
     template_tcp->keepalive_request_num = 0;
     template_tcp->keepalive = TCP::global_keepalive;
@@ -120,7 +119,7 @@ void config_template_pkt()
 
 int start_test(__rte_unused void *arg1)
 {
-    ipaddr_t base_src = ipaddr_t("10.233.1.2");
+    ip4addr_t base_src = ip4addr_t("10.233.1.2");
     uint64_t begin_ts = current_ts_msec();
     while (true)
     {
@@ -136,8 +135,9 @@ int start_test(__rte_unused void *arg1)
 
         template_tcp->snd_nxt = rand_();
         // template_tcp->rcv_nxt = 0;
+        tcp_validate_csum_opt(socket);
         
-        tcp_reply(tcp, socket, TH_SYN);
+        tcp_reply(socket, TH_SYN);
 
 
         dpdk_config_percore::cfg_send_flush();

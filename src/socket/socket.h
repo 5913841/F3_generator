@@ -17,6 +17,8 @@ typedef __uint128_t uint128_t;
 
 class Socket;
 
+struct ip4addr_t;
+
 struct ipaddr_t
 {
     union
@@ -53,6 +55,7 @@ struct ipaddr_t
         ip.s_addr = htonl(ip_);
     }
     ipaddr_t(const ipaddr_t &other) { in6 = other.in6; }
+    ipaddr_t(const ip4addr_t &other);
     ipaddr_t() { memset(&in6, 0, sizeof(in6)); }
     bool operator==(const ipaddr_t &other) const
     {
@@ -64,10 +67,41 @@ struct ipaddr_t
     }
 };
 
+struct ip4addr_t 
+{
+    in_addr ip;
+    ip4addr_t(const std::string &ip_str)
+    {
+        std::string type = distinguish_address_type(ip_str);
+        if (type == "IPv4")
+        {
+            inet_aton(ip_str.c_str(), &ip);
+        }
+        else
+        {
+            throw std::runtime_error("Invalid IP address: " + ip_str);
+        }
+    }
+    ip4addr_t(uint32_t ip_)
+    {
+        ip.s_addr = htonl(ip_);
+    }
+    ip4addr_t() { memset(&ip, 0, sizeof(ip)); }
+    ip4addr_t(const ipaddr_t &other) { ip = other.ip; }
+    bool operator==(const ipaddr_t &other) const
+    {
+        return ip.s_addr == other.ip.s_addr;
+    }
+    operator uint32_t() const
+    {
+        return ntohl(ip.s_addr);
+    }
+};
+
 struct FiveTuples
 {
-    ipaddr_t src_addr;
-    ipaddr_t dst_addr;
+    ip4addr_t src_addr;
+    ip4addr_t dst_addr;
     uint16_t src_port;
     uint16_t dst_port;
     ProtocolCode protocol_codes[4];
@@ -101,14 +135,14 @@ public:
             L5_Protocol *l5_protocol;
         };
     };
-    ipaddr_t src_addr;
-    ipaddr_t dst_addr;
+    ip4addr_t src_addr;
+    ip4addr_t dst_addr;
     uint16_t src_port;
     uint16_t dst_port;
     Socket()
     {
-        src_addr = ipaddr_t(0);
-        dst_addr = ipaddr_t(0);
+        src_addr = 0;
+        dst_addr = 0;
         src_port = 0;
         dst_port = 0;
         memset(protocols, 0, sizeof(protocols));
@@ -117,7 +151,7 @@ public:
     {
         memcpy(protocols, other.protocols, sizeof(protocols));
     }
-    Socket(in6_addr src_addr, in6_addr dst_addr, uint16_t src_port, uint16_t dst_port) : src_addr(src_addr), dst_addr(dst_addr), src_port(src_port), dst_port(dst_port)
+    Socket(uint32_t src_addr, uint32_t dst_addr, uint16_t src_port, uint16_t dst_port) : src_addr(src_addr), dst_addr(dst_addr), src_port(src_port), dst_port(dst_port)
     {
         memset(protocols, 0, sizeof(protocols));
     }
