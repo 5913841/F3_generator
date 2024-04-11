@@ -295,7 +295,7 @@ struct KeepAliveTimerQueue : public UniqueTimerQueue
     {
         tcp_do_keepalive((Socket*)timer->data);
     }
-} keepalive_timer_queue;
+};
 
 static inline void tcp_do_timeout(struct Socket *sk)
 {
@@ -316,7 +316,7 @@ struct TimeoutTimerQueue : public UniqueTimerQueue
     {
         tcp_do_timeout((Socket*)timer->data);
     }
-} timeout_timer_queue;
+};
 
 static inline void tcp_do_retransmit(struct Socket *sk)
 {
@@ -388,8 +388,6 @@ static inline void tcp_do_retransmit(struct Socket *sk)
 
 struct RetransmitTimerQueue : public UniqueTimerQueue
 {
-    Socket *sk;
-    FiveTuples ft;
     RetransmitTimerQueue()
     {
         unique_queue_init(this);
@@ -399,21 +397,25 @@ struct RetransmitTimerQueue : public UniqueTimerQueue
     {
         return tcp_do_retransmit((Socket*)timer->data);
     }
-} retransmit_timer_queue;
+};
+
+RetransmitTimerQueue* retransmit_timer_queue;
+KeepAliveTimerQueue* keepalive_timer_queue;
+TimeoutTimerQueue* timeout_timer_queue;
 
 inline void tcp_start_retransmit_timer(Socket *sk, uint64_t now_tsc)
 {
     TCP *tcp = (TCP *)sk->l4_protocol;
     if (tcp->snd_nxt != tcp->snd_una)
     {
-        unique_queue_add(&retransmit_timer_queue, &tcp->timer, now_tsc);
+        unique_queue_add(retransmit_timer_queue, &tcp->timer, now_tsc);
     }
 }
 
 inline void tcp_start_timeout_timer(struct Socket *sk, uint64_t now_tsc)
 {
     TCP *tcp = (TCP *)sk->l4_protocol;
-    unique_queue_add(&timeout_timer_queue, &tcp->timer, now_tsc);
+    unique_queue_add(timeout_timer_queue, &tcp->timer, now_tsc);
 }
 
 void tcp_start_keepalive_timer(struct Socket *sk, uint64_t now_tsc)
@@ -421,15 +423,18 @@ void tcp_start_keepalive_timer(struct Socket *sk, uint64_t now_tsc)
     TCP *tcp = (TCP *)sk->l4_protocol;
     if (TCP::global_keepalive && tcp->keepalive && (tcp->snd_nxt == tcp->snd_una))
     {
-        unique_queue_add(&keepalive_timer_queue, &tcp->timer, now_tsc);
+        unique_queue_add(keepalive_timer_queue, &tcp->timer, now_tsc);
     }
 }
 
 void TCP::timer_init()
 {
-    TIMERS.add_queue(&keepalive_timer_queue);
-    TIMERS.add_queue(&timeout_timer_queue);
-    TIMERS.add_queue(&retransmit_timer_queue);
+    keepalive_timer_queue = new KeepAliveTimerQueue();
+    timeout_timer_queue = new TimeoutTimerQueue();
+    retransmit_timer_queue = new RetransmitTimerQueue();
+    TIMERS.add_queue(keepalive_timer_queue);
+    TIMERS.add_queue(timeout_timer_queue);
+    TIMERS.add_queue(retransmit_timer_queue);
 }
 
 struct rte_mbuf *tcp_reply(struct Socket *sk, uint8_t tcp_flags)

@@ -173,9 +173,9 @@ int start_test(__rte_unused void *arg1)
         //     break;
         // }
 
-        if (dpdk_config_percore::check_epoch_timer(0.00001 * TSC_PER_SEC))
+        if (dpdk_config_percore::check_epoch_timer(0.000001 * TSC_PER_SEC))
         {
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 2; i++)
             {
                 Socket *socket = &socket_vector->get_socket(num);
                 num = (num + 1) % socket_vector->size();

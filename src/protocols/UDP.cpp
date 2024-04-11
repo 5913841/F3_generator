@@ -192,7 +192,7 @@ void udp_start_keepalive_timer(struct Socket *sk, uint64_t now_tsc)
     UDP *udp = (UDP *)sk->l4_protocol;
     if (udp->keepalive)
     {
-        unique_queue_add(&udpkeepalive_timer_queue, &udp->timer, now_tsc);
+        (&udpkeepalive_timer_queue, &udp->timer, now_tsc);
     }
 }
 

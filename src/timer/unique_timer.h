@@ -26,7 +26,7 @@ inline void unique_timer_init(struct UniqueTimer* timer)
 
 inline void unique_queue_init(struct UniqueTimerQueue *queue)
 {
-    unique_timer_init(&queue->head);
+    unique_timer_init(&(queue->head));
 }
 
 inline void unique_queue_del(struct UniqueTimer* timer)

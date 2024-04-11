@@ -154,9 +154,9 @@ int start_test(__rte_unused void *arg1)
         //     break;
         // }
 
-        if (dpdk_config_percore::check_epoch_timer(0.00001 * TSC_PER_SEC))
+        if (dpdk_config_percore::check_epoch_timer(0.0000007 * TSC_PER_SEC))
         {
-            for (int i = 0; i < 6; i++)
+            for (int i = 0; i < 3; i++)
             {
                 Socket *socket = tcp_new_socket(template_socket);
 

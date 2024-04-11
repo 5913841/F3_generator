@@ -133,7 +133,7 @@ void init_sockets()
     ip4addr_t base_src = ip4addr_t("10.233.1.0");
     ip4addr_t base_dst = ip4addr_t("10.234.1.0");
     srand_(2024);
-    for(int i = 0; i < 5000000; i++)
+    for(int i = 0; i < 10000000; i++)
     {
         Socket *socket = tcp_new_socket(template_socket);
         socket->dst_port = rand_() % 20 + 1;
