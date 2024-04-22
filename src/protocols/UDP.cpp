@@ -9,17 +9,17 @@
 #include <sys/time.h>
 #include <rte_mbuf.h>
 
-mbuf_cache *UDP::template_udp_pkt;
-uint8_t UDP::pipeline;
-bool UDP::flood;
-int UDP::global_duration_time;
-bool UDP::global_stop;
-bool UDP::payload_random;
-uint64_t UDP::keepalive_request_interval;
-std::function<void(Socket *sk)> UDP::release_socket_callback;
+__thread mbuf_cache *UDP::template_udp_pkt;
+__thread uint8_t UDP::pipeline;
+__thread bool UDP::flood;
+__thread int UDP::global_duration_time;
+__thread bool UDP::global_stop;
+__thread bool UDP::payload_random;
+__thread uint64_t UDP::keepalive_request_interval;
+__thread void (*UDP::release_socket_callback)(Socket *sk);
 void udp_start_keepalive_timer(struct Socket *sk, uint64_t now_tsc);
 
-static char g_udp_data[MBUF_DATA_SIZE] = "hello THUGEN!!\n";
+static __thread char g_udp_data[MBUF_DATA_SIZE] = "hello THUGEN!!\n";
 void udp_set_payload(char *data, int len, int new_line)
 {
     int i = 0;

@@ -4,16 +4,15 @@
 #include "socket/socket.h"
 #include <parallel_hashmap/phmap.h>
 
-class SocketPointerTable
+class ParallelSocketPointerTable
 {
 public:
-    SocketPointerTable() {}
-    SocketPointerTable(int init_size)
+    ParallelSocketPointerTable() {}
+    ParallelSocketPointerTable(int init_size)
     {
         socket_table.reserve(init_size);
     }
-
-    phmap::parallel_flat_hash_set<Socket *, SocketPointerHash, SocketPointerEqual> socket_table;
+    phmap::parallel_flat_hash_set<Socket *, SocketPointerHash, SocketPointerEqual, phmap::priv::Allocator<Socket *>, 4, std::mutex> socket_table;
     // phmap::parallel_flat_hash_set<Socket *, SocketPointerHash, SocketPointerEqual>::iterator last_find_socket_table_it;
     Socket *find_socket(Socket *socket)
     {

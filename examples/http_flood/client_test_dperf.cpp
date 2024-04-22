@@ -28,7 +28,6 @@ mbuf_cache *template_tcp_pkt = new mbuf_cache();
 const char *data;
 SocketPointerTable *socket_table = new SocketPointerTable();
 
-ip4addr_t target_ip("10.233.1.1");
 
 dpdk_config_user usrconfig = {
     .lcores = {0},
@@ -106,7 +105,7 @@ void config_http_variables()
 void config_socket()
 {
     template_socket->src_addr = 0;
-    template_socket->dst_addr = target_ip;
+    template_socket->dst_addr = 0;
     template_socket->src_port = 0;
     template_socket->dst_port = 0;
     template_socket->set_protocol(SOCKET_L2, ether);
@@ -117,20 +116,22 @@ void config_socket()
 
 void config_template_pkt()
 {
-    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", g_config_percore->port_id, g_config_percore->queue_id);
+    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", config.ports[0].id, 0);
     mbuf_template_pool_setby_socket(template_tcp_data, template_socket, data, strlen(data));
-    template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", g_config_percore->port_id, g_config_percore->queue_id);
+    template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", config.ports[0].id, 0);
     mbuf_template_pool_setby_socket(template_tcp_pkt, template_socket, nullptr, 0);
     TCP::constructing_opt_tmeplate = true;
-    template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_opt", g_config_percore->port_id, g_config_percore->queue_id);
+    template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_opt", config.ports[0].id, 0);
     mbuf_template_pool_setby_socket(template_tcp_opt, template_socket, nullptr, 0);
 }
 
 int start_test(__rte_unused void *arg1)
 {
-    ip4addr_t base_src = ip4addr_t("10.233.1.2");
     uint64_t begin_ts = current_ts_msec();
     Socket *parser_socket = new Socket();
+    ip4addr_t dst_base = ip4addr_t("6.6.248.3");
+    ip4addr_t src_base1 = ip4addr_t("6.6.245.3");
+    ip4addr_t src_base2 = ip4addr_t("6.6.246.3");
     while (true)
     {
         do
@@ -159,10 +160,14 @@ int start_test(__rte_unused void *arg1)
             for (int i = 0; i < 3; i++)
             {
                 Socket *socket = tcp_new_socket(template_socket);
-
-                socket->dst_port = rand() % 20 + 1;
-                socket->src_port = rand();
-                socket->src_addr = rand() % 11 + base_src;
+                socket->dst_addr = dst_base + rand_() % 2;
+                socket->dst_port = 80 + rand_() % 5;
+                socket->src_port = rand_();
+                socket->src_addr = src_base1 + rand_() % 10;
+                if (rand_() % 2)
+                {
+                    socket->src_addr = src_base2 + rand_() % 10;
+                }
                 if (socket_table->insert_socket(socket) == -1)
                 {
                     tcp_release_socket(socket);

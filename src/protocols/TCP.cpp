@@ -8,35 +8,36 @@
 #include <random>
 #include "timer/rand.h"
 
-bool TCP::flood;
-bool TCP::server;
-uint8_t TCP::send_window;
-mbuf_cache *TCP::template_tcp_data;
-mbuf_cache *TCP::template_tcp_opt;
-mbuf_cache *TCP::template_tcp_pkt;
-int TCP::global_duration_time;
-bool TCP::global_keepalive;
-bool TCP::global_stop;
+
+__thread bool TCP::flood;
+__thread bool TCP::server;
+__thread uint8_t TCP::send_window;
+__thread mbuf_cache *TCP::template_tcp_data;
+__thread mbuf_cache *TCP::template_tcp_opt;
+__thread mbuf_cache *TCP::template_tcp_pkt;
+__thread int TCP::global_duration_time;
+__thread bool TCP::global_keepalive;
+__thread bool TCP::global_stop;
 // ms
-uint64_t TCP::keepalive_request_interval;
-int TCP::setted_keepalive_request_num;
+__thread uint64_t TCP::keepalive_request_interval;
+__thread int TCP::setted_keepalive_request_num;
 // std::function<void(Socket *sk)> TCP::release_socket_callback;
 // std::function<void(Socket *sk)> TCP::create_socket_callback;
 // std::function<bool(FiveTuples ft, Socket *sk)> TCP::checkvalid_socket_callback;
-void (*TCP::release_socket_callback)(Socket *sk);
-void (*TCP::create_socket_callback)(Socket *sk);
-bool (*TCP::checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
-bool TCP::global_tcp_rst;
-uint8_t TCP::tos;
-bool TCP::use_http;
-uint16_t TCP::global_mss;
-bool TCP::constructing_opt_tmeplate;
+__thread void (*TCP::release_socket_callback)(Socket *sk);
+__thread void (*TCP::create_socket_callback)(Socket *sk);
+__thread bool (*TCP::checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
+__thread bool TCP::global_tcp_rst;
+__thread uint8_t TCP::tos;
+__thread bool TCP::use_http;
+__thread uint16_t TCP::global_mss;
+__thread bool TCP::constructing_opt_tmeplate;
 
-TCP *parser_tcp = new TCP();
+thread_local TCP *parser_tcp = new TCP();
 
 __thread uint32_t ip_id = 0;
 
-static bool close_after_process_fin;
+static thread_local bool close_after_process_fin;
 
 extern void tcp_start_retransmit_timer(Socket *sk, uint64_t now_tsc);
 extern void tcp_start_timeout_timer(Socket *sk, uint64_t now_tsc);
@@ -193,25 +194,21 @@ static void tcp_socket_close(struct Socket *sk)
 {
     TCP *tcp = (TCP *)sk->l4_protocol;
     unique_queue_del(&tcp->timer);
-    if (tcp->state != TCP_CLOSE)
-    {
+    // if (tcp->state != TCP_CLOSE)
+    // {
         tcp->state = TCP_CLOSE;
         /* don't clear sequences in TIME-WAIT */
         tcp->release_socket_callback(sk);
         net_stats_socket_close();
-    }
+#ifdef DEBUG_
+    printf("Thread: %d, tcp_close_socket: %p\n", g_config_percore->lcore_id, sk);
+#endif
+    // }
 }
 
 static inline void tcp_process_rst(struct Socket *sk, struct rte_mbuf *m)
 {
     TCP *tcp = (TCP *)sk->l4_protocol;
-#ifdef DPERF_DEBUG
-    if (sk->log)
-    {
-        SOCKET_LOG(sk, "rst");
-        MBUF_LOG(m, "rst");
-    }
-#endif
     if (tcp->state != TCP_CLOSE)
     {
         tcp_socket_close(sk);
@@ -254,6 +251,9 @@ static inline void tcp_send_keepalive_request(struct Socket *sk)
 
 static inline void tcp_do_keepalive(struct Socket *sk)
 {
+#ifdef DEBUG_
+    printf("Thread: %d, tcp_do_keepalive: %p\n", g_config_percore->lcore_id, sk);
+#endif
     TCP *tcp = (TCP *)sk->l4_protocol;
     if ((tcp->snd_nxt != tcp->snd_una) || (tcp->state != TCP_ESTABLISHED) || (tcp->keepalive == 0))
     {
@@ -293,12 +293,15 @@ struct KeepAliveTimerQueue : public UniqueTimerQueue
     }
     void callback(UniqueTimer *timer) override
     {
-        tcp_do_keepalive((Socket*)timer->data);
+        tcp_do_keepalive((Socket *)timer->data);
     }
 };
 
 static inline void tcp_do_timeout(struct Socket *sk)
 {
+#ifdef DEBUG_
+    printf("Thread: %d, tcp_do_timeout: %p\n", g_config_percore->lcore_id, sk);
+#endif
     TCP *tcp = (TCP *)sk->l4_protocol;
     net_stats_socket_error();
     tcp_socket_close(sk);
@@ -314,12 +317,15 @@ struct TimeoutTimerQueue : public UniqueTimerQueue
     }
     void callback(UniqueTimer *timer) override
     {
-        tcp_do_timeout((Socket*)timer->data);
+        tcp_do_timeout((Socket *)timer->data);
     }
 };
 
 static inline void tcp_do_retransmit(struct Socket *sk)
 {
+#ifdef DEBUG_
+    printf("Thread: %d, tcp_do_retransmit: %p\n", g_config_percore->lcore_id, sk);
+#endif
     TCP *tcp = (TCP *)sk->l4_protocol;
     uint32_t snd_nxt = 0;
     uint8_t flags = 0;
@@ -395,13 +401,13 @@ struct RetransmitTimerQueue : public UniqueTimerQueue
     }
     void callback(UniqueTimer *timer) override
     {
-        return tcp_do_retransmit((Socket*)timer->data);
+        return tcp_do_retransmit((Socket *)timer->data);
     }
 };
 
-RetransmitTimerQueue* retransmit_timer_queue;
-KeepAliveTimerQueue* keepalive_timer_queue;
-TimeoutTimerQueue* timeout_timer_queue;
+__thread RetransmitTimerQueue *retransmit_timer_queue;
+__thread KeepAliveTimerQueue *keepalive_timer_queue;
+__thread TimeoutTimerQueue *timeout_timer_queue;
 
 inline void tcp_start_retransmit_timer(Socket *sk, uint64_t now_tsc)
 {
@@ -605,7 +611,8 @@ static inline uint8_t *tcp_data_get(struct iphdr *iph, struct tcphdr *th, uint16
 inline void tcp_stop_retransmit_timer(TCP *tcp)
 {
     tcp->retrans = 0;
-    if (tcp->snd_nxt == tcp->snd_una) {
+    if (tcp->snd_nxt == tcp->snd_una)
+    {
         unique_queue_del(&tcp->timer);
     }
 }
@@ -765,6 +772,9 @@ static inline bool tcp_check_sequence(struct Socket *sk, struct tcphdr *th, uint
 
 inline void tcp_server_process_syn(struct Socket *sk, struct rte_mbuf *m, struct tcphdr *th)
 {
+#ifdef DEBUG_
+    printf("Thread: %d, tcp_server_process_syn: %p\n", g_config_percore->lcore_id, sk);
+#endif
     TCP *tcp = (TCP *)sk->l4_protocol;
     /* fast recycle */
     if (tcp->state == TCP_TIME_WAIT)
@@ -777,9 +787,6 @@ inline void tcp_server_process_syn(struct Socket *sk, struct rte_mbuf *m, struct
         tcp->create_socket_callback(sk);
         net_stats_socket_open();
         tcp->state = TCP_SYN_RECV;
-#ifdef DPERF_DEBUG
-        tcp->log = 0;
-#endif
         tcp->retrans = 0;
         tcp->keepalive_request_num = 0;
         tcp->snd_nxt++;
@@ -860,6 +867,9 @@ inline void tcp_client_process_syn_ack(struct Socket *sk,
 
 inline uint8_t tcp_process_fin(struct Socket *sk, uint8_t rx_flags, uint8_t tx_flags)
 {
+#ifdef DEBUG_
+    printf("Thread: %d, tcp_process_fin: %p\n", g_config_percore->lcore_id, sk);
+#endif
     TCP *tcp = (TCP *)sk->l4_protocol;
     uint8_t flags = 0;
 
@@ -920,6 +930,9 @@ inline uint8_t tcp_process_fin(struct Socket *sk, uint8_t rx_flags, uint8_t tx_f
 static inline void tcp_server_process_data(struct Socket *sk, struct rte_mbuf *m,
                                            struct iphdr *iph, struct tcphdr *th)
 {
+#ifdef DEBUG_
+    printf("Thread: %d, tcp_server_process_data: %p\n", g_config_percore->lcore_id, sk);
+#endif
     TCP *tcp = (TCP *)sk->l4_protocol;
     uint8_t *data = NULL;
     uint8_t tx_flags = 0;
@@ -1183,6 +1196,9 @@ Socket *tcp_new_socket(const Socket *template_socket)
     TCP *tcp = new TCP(*(TCP *)template_socket->l4_protocol);
     socket->l4_protocol = tcp;
     socket->l5_protocol = new HTTP(*(HTTP *)template_socket->l5_protocol);
+#ifdef DEBUG_
+    printf("Thread: %d, tcp_new_socket: %p\n", g_config_percore->lcore_id, socket);
+#endif
     return socket;
 }
 
@@ -1202,14 +1218,20 @@ void tcp_validate_socket(Socket *socket)
     unique_timer_init(&tcp->timer);
     tcp->snd_nxt = rand_();
     tcp->snd_una = tcp->snd_nxt;
+    tcp->keepalive_request_num = 0;
+    tcp->flags = 0;
+    tcp->keepalive = TCP::global_keepalive;
+#ifdef DEBUG_
+    printf("Thread: %d, tcp_validate_socket: %p\n", g_config_percore->lcore_id, socket);
+#endif
 }
 
 void tcp_validate_csum(Socket *socket)
 {
     TCP *tcp = (TCP *)socket->l4_protocol;
-    tcp->csum_tcp = csum_pseudo_ipv4(IPPROTO_TCP, socket->src_addr, socket->dst_addr, TCP::template_tcp_pkt->data.l4_len);
-    tcp->csum_tcp_data = csum_pseudo_ipv4(IPPROTO_TCP, socket->src_addr, socket->dst_addr, TCP::template_tcp_data->data.l4_len);
-    tcp->csum_tcp_opt = csum_pseudo_ipv4(IPPROTO_TCP, socket->src_addr, socket->dst_addr, TCP::template_tcp_opt->data.l4_len);
+    tcp->csum_tcp = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), TCP::template_tcp_pkt->data.l4_len + TCP::template_tcp_pkt->data.data_len);
+    tcp->csum_tcp_data = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), TCP::template_tcp_data->data.l4_len + TCP::template_tcp_data->data.data_len);
+    tcp->csum_tcp_opt = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), TCP::template_tcp_opt->data.l4_len + TCP::template_tcp_opt->data.data_len);
 }
 
 void tcp_validate_csum_opt(Socket *socket)
@@ -1225,4 +1247,7 @@ void tcp_launch(Socket *socket)
     tcp->state = TCP_SYN_SENT;
     tcp_reply(socket, TH_SYN);
     net_stats_socket_open();
+#ifdef DEBUG_
+    printf("Thread: %d, tcp_launch_socket: %p\n", g_config_percore->lcore_id, socket);
+#endif
 }

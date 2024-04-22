@@ -1,3 +1,3 @@
 #include "ETH.h"
 
-ETHER *parser_eth = new ETHER();
+thread_local ETHER *parser_eth = new ETHER();

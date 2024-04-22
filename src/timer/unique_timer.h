@@ -102,6 +102,6 @@ struct UniqueQueueGroup
     }
 };
 
-extern __thread UniqueQueueGroup TIMERS;
+extern thread_local UniqueQueueGroup TIMERS;
 
 #endif

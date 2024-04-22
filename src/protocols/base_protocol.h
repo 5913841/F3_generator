@@ -66,7 +66,7 @@ class L2_Protocol : public Protocol
 {
 public:
     L2_Protocol() = default;
-    static PacketParser parser;
+    static thread_local PacketParser parser;
     virtual ProtocolCode name() override { return PTC_NONE; }
     virtual int send_frame(Socket *socket, rte_mbuf *data) = 0;
 };
@@ -75,7 +75,7 @@ class L3_Protocol : public Protocol
 {
 public:
     L3_Protocol() = default;
-    static PacketParser parser;
+    static thread_local PacketParser parser;
     virtual ProtocolCode name() override { return PTC_NONE; }
 };
 
@@ -83,7 +83,7 @@ class L4_Protocol : public Protocol
 {
 public:
     L4_Protocol() = default;
-    static PacketParser parser;
+    static thread_local PacketParser parser;
     virtual ProtocolCode name() override { return PTC_NONE; }
     virtual int process(Socket *socket, rte_mbuf *data) = 0;
 };
@@ -92,7 +92,7 @@ class L5_Protocol : public Protocol
 {
 public:
     L5_Protocol() = default;
-    static PacketParser parser;
+    static thread_local PacketParser parser;
     virtual ProtocolCode name() override { return PTC_NONE; }
 };
 

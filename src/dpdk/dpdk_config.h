@@ -20,11 +20,21 @@ struct dpdk_config
 {
     int num_lcores;
     int lcores[MAX_LCORES];
-    uint8_t rss;
-    bool mq_rx_rss;
-    uint8_t rss_auto;
     bool jumbo;
     bool always_accurate_time;
+
+    bool use_fdir;
+    int addr_family;
+    uint32_t src_range_mask;
+    uint32_t dst_range_mask;
+    uint32_t src_base_ip;
+    uint32_t dst_base_ip;
+
+    bool use_rss;
+    uint8_t rss_type;
+    bool mq_rx_rss;
+    uint8_t rss_auto;
+
     uint16_t jumbo_mtu;
     uint16_t vlan_id;
     int num_rx_queues;
@@ -83,7 +93,10 @@ struct dpdk_config_percore
         if (unlikely(tsc_time_go(&g_config_percore->time.second, time_in_config())))
         {
             net_stats_timer_handler();
-            net_stats_print_speed(0, g_config_percore->time.second.count);
+            if(g_config_percore->lcore_id == 0)
+            {
+                net_stats_print_speed(0, g_config_percore->time.second.count);
+            }
         }
 
         if (unlikely(time_in_config() - g_config_percore->epoch_last_tsc >= gap_tsc))

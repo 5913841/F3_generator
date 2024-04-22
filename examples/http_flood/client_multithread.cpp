@@ -9,7 +9,8 @@
 #include "protocols/IP.h"
 #include "protocols/TCP.h"
 #include "protocols/HTTP.h"
-#include "socket/socket_table/socket_table.h"
+#include "socket/socket_table/parallel_socket_table.h"
+// #include "socket/socket_table/socket_table.h"
 #include "socket/socket_tree/socket_tree.h"
 #include "protocols/base_protocol.h"
 #include <rte_lcore.h>
@@ -17,16 +18,16 @@
 // #define RTE_PKTMBUF_HEADROOM 256
 #define MBUF_SIZE (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 
-ETHER *ether = new ETHER();
-IPV4 *ip = new IPV4();
-TCP *template_tcp = new TCP();
-HTTP *template_http = new HTTP();
-Socket *template_socket = new Socket();
-mbuf_cache *template_tcp_data = new mbuf_cache();
-mbuf_cache *template_tcp_opt = new mbuf_cache();
-mbuf_cache *template_tcp_pkt = new mbuf_cache();
-const char *data;
-SocketPointerTable *socket_table = new SocketPointerTable();
+thread_local ETHER *ether = new ETHER();
+thread_local IPV4 *ip = new IPV4();
+thread_local TCP *template_tcp = new TCP();
+thread_local HTTP *template_http = new HTTP();
+thread_local Socket *template_socket = new Socket();
+thread_local mbuf_cache *template_tcp_data = new mbuf_cache();
+thread_local mbuf_cache *template_tcp_opt = new mbuf_cache();
+thread_local mbuf_cache *template_tcp_pkt = new mbuf_cache();
+thread_local const char *data;
+ParallelSocketPointerTable *socket_table = new ParallelSocketPointerTable();
 
 ip4addr_t target_ip("10.233.1.1");
 
@@ -117,12 +118,12 @@ void config_socket()
 
 void config_template_pkt()
 {
-    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", g_config_percore->port_id, g_config_percore->queue_id);
+    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", config.ports[0].id, 0);
     mbuf_template_pool_setby_socket(template_tcp_data, template_socket, data, strlen(data));
-    template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", g_config_percore->port_id, g_config_percore->queue_id);
+    template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", config.ports[0].id, 0);
     mbuf_template_pool_setby_socket(template_tcp_pkt, template_socket, nullptr, 0);
     TCP::constructing_opt_tmeplate = true;
-    template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_opt", g_config_percore->port_id, g_config_percore->queue_id);
+    template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_opt", config.ports[0].id, 0);
     mbuf_template_pool_setby_socket(template_tcp_opt, template_socket, nullptr, 0);
 }
 
@@ -178,10 +179,8 @@ int start_test(__rte_unused void *arg1)
     return 0;
 }
 
-int main(int argc, char **argv)
+int thread_main(void *arg)
 {
-    dpdk_init(&config, argv[0]);
-    int lcore_id = 0;
     config_ether_variables();
     config_ip_variables();
     config_tcp_variables();
@@ -189,4 +188,12 @@ int main(int argc, char **argv)
     config_socket();
     config_template_pkt();
     start_test(NULL);
+    return 0;
+}
+
+int main(int argc, char **argv)
+{
+    dpdk_init(&config, argv[0]);
+    dpdk_run(thread_main, NULL);
+    return 0;
 }

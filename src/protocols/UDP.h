@@ -25,14 +25,14 @@ public:
     uint16_t keepalive_request_num : 15;
     uint16_t keepalive : 1;
     uint64_t timer_tsc;
-    static std::function<void(Socket *sk)> release_socket_callback;
-    static mbuf_cache *template_udp_pkt;
-    static uint8_t pipeline;
-    static bool flood;
-    static int global_duration_time;
-    static bool global_stop;
-    static bool payload_random;
-    static uint64_t keepalive_request_interval;
+    static __thread void (*release_socket_callback)(Socket *sk);
+    static __thread mbuf_cache *template_udp_pkt;
+    static __thread uint8_t pipeline;
+    static __thread bool flood;
+    static __thread int global_duration_time;
+    static __thread bool global_stop;
+    static __thread bool payload_random;
+    static __thread uint64_t keepalive_request_interval;
     ProtocolCode name() override { return ProtocolCode::PTC_UDP; }
 
     static udphdr *decode_hdr_pre(rte_mbuf *data)

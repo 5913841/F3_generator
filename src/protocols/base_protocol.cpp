@@ -1,10 +1,10 @@
 #include "base_protocol.h"
 #include "socket/socket.h"
 
-PacketParser L2_Protocol::parser = {.parser_fivetuples_num = 0, .parser_socket_num = 0};
-PacketParser L3_Protocol::parser = {.parser_fivetuples_num = 0, .parser_socket_num = 0};
-PacketParser L4_Protocol::parser = {.parser_fivetuples_num = 0, .parser_socket_num = 0};
-PacketParser L5_Protocol::parser = {.parser_fivetuples_num = 0, .parser_socket_num = 0};
+thread_local PacketParser L2_Protocol::parser = {.parser_fivetuples_num = 0, .parser_socket_num = 0};
+thread_local PacketParser L3_Protocol::parser = {.parser_fivetuples_num = 0, .parser_socket_num = 0};
+thread_local PacketParser L4_Protocol::parser = {.parser_fivetuples_num = 0, .parser_socket_num = 0};
+thread_local PacketParser L5_Protocol::parser = {.parser_fivetuples_num = 0, .parser_socket_num = 0};
 
 int PacketParser::parse_packet(rte_mbuf *data, FiveTuples *ft, int offset)
 {

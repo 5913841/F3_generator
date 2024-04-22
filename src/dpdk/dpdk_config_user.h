@@ -14,6 +14,16 @@ struct dpdk_config_user
     std::vector<int> queue_num_per_port;
     std::string socket_mem;
     bool always_accurate_time;
+    std::string flow_distribution_strategy;
+    std::string rss_type;
+    std::string rss_auto_type;
+    int addr_family;
+    uint32_t src_range_mask;
+    uint32_t dst_range_mask;
+    uint32_t src_base_ip;
+    uint32_t dst_base_ip;
+    bool mq_rx_rss;
+    bool mq_rx_none;
     int tx_burst_size;
     int rx_burst_size;
 };

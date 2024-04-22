@@ -22,7 +22,7 @@ static inline void eth_addr_swap(struct ether_header *eth)
 
 class ETHER;
 
-extern ETHER *parser_eth;
+extern thread_local ETHER *parser_eth;
 
 class ETHER : public L2_Protocol
 {

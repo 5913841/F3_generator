@@ -10,8 +10,8 @@ public:
     std::vector<Socket> sockets;
     SocketVector();
     SocketVector(int size);
-    void add_socket(const Socket& socket);
-    Socket& get_socket(int index);
+    void add_socket(const Socket &socket);
+    Socket &get_socket(int index);
     int size() const;
 };
 

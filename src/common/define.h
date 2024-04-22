@@ -87,7 +87,7 @@
 #define HTTP_F_CLOSE 0x8
 #define HTTP_HOST_MAX 128
 #define HTTP_PATH_MAX 256
-#define HTTP_HOST_DEFAULT "dperf"
+#define HTTP_HOST_DEFAULT "THUGEN"
 #define HTTP_PATH_DEFAULT "/"
 
 #define STRING_SIZE(str) (sizeof(str) - 1)

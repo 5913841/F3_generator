@@ -24,12 +24,12 @@ static char http_rsp[MBUF_DATA_SIZE];
 static char http_req[MBUF_DATA_SIZE];
 static const char *http_rsp_body_default = "hello THUGEN!\r\n";
 
-HTTP *parser_http = new HTTP();
+thread_local HTTP *parser_http = new HTTP();
 
-int HTTP::payload_size;
-bool HTTP::payload_random;
-char HTTP::http_host[HTTP_HOST_MAX];
-char HTTP::http_path[HTTP_PATH_MAX];
+__thread int HTTP::payload_size;
+__thread bool HTTP::payload_random;
+__thread char HTTP::http_host[HTTP_HOST_MAX];
+__thread char HTTP::http_path[HTTP_PATH_MAX];
 __thread struct HTTP::delay_vec HTTP::ack_delay;
 
 const char *http_get_request(void)

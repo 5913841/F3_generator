@@ -20,11 +20,7 @@ static inline void mbuf_prefetch(struct rte_mbuf *m)
 void mbuf_print(struct rte_mbuf *m, const char *tag);
 void mbuf_log(struct rte_mbuf *m, const char *tag);
 
-#ifdef DPERF_DEBUG
-#define MBUF_LOG(m, tag) mbuf_log(m, tag)
-#else
 #define MBUF_LOG(m, tag)
-#endif
 
 int mbuf_pool_init(struct config *cfg);
 struct rte_mempool *mbuf_pool_create(dpdk_config *cfg, const char *str, uint16_t port_id, uint16_t queue_id);

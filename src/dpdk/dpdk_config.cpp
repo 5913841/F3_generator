@@ -2,7 +2,7 @@
 #include "panel/panel.h"
 #include "timer/clock.h"
 
-thread_local dpdk_config_percore *g_config_percore;
+__thread dpdk_config_percore *g_config_percore;
 dpdk_config *g_config;
 
 dpdk_config::dpdk_config(dpdk_config_user *user_config)
@@ -13,6 +13,70 @@ dpdk_config::dpdk_config(dpdk_config_user *user_config)
     always_accurate_time = user_config->always_accurate_time;
     tx_burst_size = user_config->tx_burst_size;
     rx_burst_size = user_config->rx_burst_size;
+    if (user_config->flow_distribution_strategy == "rss")
+    {
+        use_rss = true;
+        use_fdir = false;
+    }
+    else if (user_config->flow_distribution_strategy == "fdir")
+    {
+        use_rss = false;
+        use_fdir = true;
+    }
+    addr_family = AF_INET;
+    if (use_rss)
+    {
+        mq_rx_rss = true;
+        if (user_config->rss_type == "l3")
+        {
+            rss_type = RSS_L3;
+        }
+        else if (user_config->rss_type == "l3l4")
+        {
+            rss_type = RSS_L3L4;
+        }
+        else if (user_config->rss_type == "auto")
+        {
+            rss_type = RSS_AUTO;
+        }
+        else
+        {
+            printf("Error: unknown rss type \'%s\'\n", user_config->rss_type.c_str());
+        }
+
+        if (user_config->mq_rx_rss)
+        {
+            mq_rx_rss = true;
+        }
+        else if (user_config->mq_rx_none)
+        {
+            if (rss_type != RSS_AUTO)
+            {
+                printf("Error: rss type \'%s\' dose not support \'mq_rx_none\'\n", user_config->rss_type.c_str());
+            }
+            mq_rx_rss = false;
+        }
+        else if (rss_type == RSS_AUTO && user_config->rss_auto_type == "l3")
+        {
+            rss_auto = RSS_L3;
+            mq_rx_rss = true;
+        }
+        else if (rss_type == RSS_AUTO && user_config->rss_auto_type == "l3l4")
+        {
+            rss_auto = RSS_L3L4;
+            mq_rx_rss = true;
+        }
+    }
+
+    if(use_fdir)
+    {
+        addr_family = user_config->addr_family;
+        src_base_ip = user_config->src_base_ip;
+        dst_base_ip = user_config->dst_base_ip;
+        src_range_mask = user_config->src_range_mask;
+        dst_range_mask = user_config->dst_range_mask;
+    }
+
     for (int i = 0; i < user_config->ports.size(); i++)
     {
         memcpy(ports[i].pci, user_config->ports[i].data(), PCI_LEN * sizeof(char));
@@ -54,7 +118,7 @@ dpdk_config_percore::dpdk_config_percore(dpdk_config *config)
 {
     lcore_id = rte_lcore_id();
     port_id = lcore_id % config->num_ports;
-    queue_id = lcore_id % config->num_ports;
+    queue_id = lcore_id / config->num_ports;
     tick_time_init(&time);
     cpuload_init(&cpusage);
     port = &config->ports[port_id];
@@ -85,8 +149,9 @@ dpdk_config_percore::dpdk_config_percore(dpdk_config *config)
 //     return false;
 // }
 
-uint64_t& time_in_config() {
-    if(g_config->always_accurate_time) 
+uint64_t &time_in_config()
+{
+    if (g_config->always_accurate_time)
     {
         tick_time_update(&g_config_percore->time);
     }

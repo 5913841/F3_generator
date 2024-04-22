@@ -8,7 +8,7 @@
 
 class HTTP;
 
-extern HTTP *parser_http;
+extern thread_local HTTP *parser_http;
 
 enum HTTP_STATE
 {
@@ -48,17 +48,17 @@ public:
     uint8_t http_ack;
     uint8_t snd_window;
     uint32_t snd_max;
-    static int payload_size;
-    static bool payload_random;
-    static char http_host[HTTP_HOST_MAX];
-    static char http_path[HTTP_PATH_MAX];
+    HTTP_STATE state;
+    static __thread int payload_size;
+    static __thread bool payload_random;
+    static __thread char http_host[HTTP_HOST_MAX];
+    static __thread char http_path[HTTP_PATH_MAX];
     static __thread struct delay_vec
     {
         int next;
         struct Socket *sockets[HTTP_ACK_DELAY_MAX];
     } ack_delay;
     // #endif
-    HTTP_STATE state;
     HTTP() : L5_Protocol() {}
     ProtocolCode name() override { return ProtocolCode::PTC_HTTP; }
     inline size_t get_hdr_len(Socket *socket, rte_mbuf *data)

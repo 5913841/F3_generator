@@ -1,10 +1,29 @@
+/*
+ * Copyright (c) 2021-2022 Baidu.com, Inc. All Rights Reserved.
+ * Copyright (c) 2022-2023 Jianzhang Peng. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Author: Jianzhang Peng (pengjianzhang@baidu.com)
+ *         Jianzhang Peng (pengjianzhang@gmail.com)
+ */
+
 #include "dpdk/divert/rss.h"
-#include "common/define.h"
-#include "dpdk_config.h"
-#include "socket/socket.h"
 #include <stdbool.h>
 #include <rte_ethdev.h>
 #include <rte_thash.h>
+#include "dpdk/dpdk_config.h"
+#include "socket/socket.h"
 
 #define RSS_HASH_KEY_LENGTH 40
 static uint8_t rss_hash_key_symmetric_be[RSS_HASH_KEY_LENGTH];
@@ -31,15 +50,15 @@ static uint64_t rss_get_rss_hf(struct rte_eth_dev_info *dev_info, uint8_t rss)
         ipv6_flags = RTE_ETH_RSS_NONFRAG_IPV6_UDP | RTE_ETH_RSS_NONFRAG_IPV6_TCP;
     }
 
-    if (g_config.ipv6) {
-        if ((offloads & ipv6_flags) == 0) {
-            return 0;
-        }
-    } else {
-        if ((offloads & ipv4_flags) == 0) {
-            return 0;
-        }
+    // if (g_config.ipv6) {
+    //     if ((offloads & ipv6_flags) == 0) {
+    //         return 0;
+    //     }
+    // } else {
+    if ((offloads & ipv4_flags) == 0) {
+        return 0;
     }
+    // }
 
     return (offloads & (ipv4_flags | ipv6_flags));
 }
@@ -49,21 +68,16 @@ int rss_config_port(struct rte_eth_conf *conf, struct rte_eth_dev_info *dev_info
     uint64_t rss_hf = 0;
     struct rte_eth_rss_conf *rss_conf = NULL;
 
-    /* no need to configure hardware */
-    if (g_config.flood) {
-        return 0;
-    }
-
     rss_conf = &conf->rx_adv_conf.rss_conf;
-    if (g_config.rss == RSS_AUTO) {
-        if (g_config.mq_rx_rss) {
+    if (g_config->rss_type == RSS_AUTO) {
+        if (g_config->mq_rx_rss) {
             conf->rxmode.mq_mode = RTE_ETH_MQ_RX_RSS;
-            rss_conf->rss_hf = rss_get_rss_hf(dev_info, g_config.rss_auto);
+            rss_conf->rss_hf = rss_get_rss_hf(dev_info, g_config->rss_auto);
         }
         return 0;
     }
 
-    rss_hf = rss_get_rss_hf(dev_info, g_config.rss);
+    rss_hf = rss_get_rss_hf(dev_info, g_config->rss_type);
     if (rss_hf == 0) {
         return -1;
     }
@@ -87,18 +101,61 @@ static uint32_t rss_hash_data(uint32_t *data, int len)
     return rte_softrss_be(data, len, rss_hash_key_symmetric_be);
 }
 
-// bool rss_check_socket(dpdk_config* cfg, struct Socket* sk)
-// {
-//     uint32_t hash = 0;
+static uint32_t rss_hash_socket_ipv4(Socket *sk)
+{
+    int len = 2;
+    struct rte_ipv4_tuple tuple;
 
-//     hash = FiveTuples::hash(FiveTuples(sk));
-//     hash = hash % cfg->port->queue_num;
-//     if (hash == cfg->queue_id) {
-//         return true;
-//     }
+    tuple.src_addr = sk->src_addr;
+    tuple.dst_addr = sk->dst_addr;
+    if (g_config->rss_type == RSS_L3L4) {
+        tuple.dport = sk->dst_port;
+        tuple.sport = sk->src_port;
+        len++;
+    }
 
-//     return false;
-// }
+    return rss_hash_data((uint32_t *)&tuple, len);
+}
+
+static uint32_t rss_hash_socket_ipv6(Socket *sk)
+{
+    int len = 8;
+    ipaddr_t laddr;
+    ipaddr_t faddr;
+    struct rte_ipv6_tuple tuple;
+    struct netif_port *port = NULL;
+
+    port = g_config_percore->port;
+    // ipaddr_join(&port->client_ip_range.start, sk->laddr, &laddr);
+    // ipaddr_join(&port->server_ip_range.start, sk->faddr, &faddr);
+    memcpy(tuple.src_addr, &laddr, 16);
+    memcpy(tuple.dst_addr, &faddr, 16);
+
+    if (g_config->rss_type == RSS_L3L4) {
+        tuple.dport = sk->dst_port;
+        tuple.sport = sk->src_port;
+        len++;
+    }
+
+    return rss_hash_data((uint32_t *)&tuple, len);
+}
+
+bool rss_check_socket(Socket *sk)
+{
+    uint32_t hash = 0;
+
+    // if (ws->ipv6) {
+    //     hash = rss_hash_socket_ipv6(ws, sk);
+    // } else {
+        hash = rss_hash_socket_ipv4(sk);
+    // }
+    hash = hash % g_config_percore->port->queue_num;
+    if (hash == g_config_percore->queue_id) {
+        return true;
+    }
+
+    return false;
+}
 
 void rss_init(void)
 {

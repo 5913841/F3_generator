@@ -53,5 +53,3 @@ int port_config(struct netif_port *port);
 struct rte_mempool *port_get_mbuf_pool(struct netif_port *p, int queue_id);
 
 #endif /* _PORT_H_ */
-
-// dperf

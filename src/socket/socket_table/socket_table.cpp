@@ -1,6 +1,6 @@
 #include "socket/socket_table/socket_table.h"
 
-Socket *socket_ft = nullptr;
+thread_local Socket *socket_ft = nullptr;
 
 Socket *SocketPointerTable::find_socket(FiveTuples ft)
 {

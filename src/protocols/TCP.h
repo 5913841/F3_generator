@@ -26,7 +26,7 @@ struct tcp_opt_mss
 
 class TCP;
 
-extern TCP *parser_tcp;
+extern thread_local TCP *parser_tcp;
 
 class TCP : public L4_Protocol
 {
@@ -49,29 +49,29 @@ public:
     uint8_t keepalive : 1;
     uint8_t flags; /* tcp flags*/
 
-    static bool flood;
-    static bool server;
-    static uint8_t send_window;
-    static mbuf_cache *template_tcp_data;
-    static mbuf_cache *template_tcp_opt;
-    static mbuf_cache *template_tcp_pkt;
-    static int global_duration_time;
-    static bool global_keepalive;
-    static bool global_stop;
+    static __thread bool flood;
+    static __thread bool server;
+    static __thread uint8_t send_window;
+    static __thread mbuf_cache *template_tcp_data;
+    static __thread mbuf_cache *template_tcp_opt;
+    static __thread mbuf_cache *template_tcp_pkt;
+    static __thread int global_duration_time;
+    static __thread bool global_keepalive;
+    static __thread bool global_stop;
     /* tsc */
-    static uint64_t keepalive_request_interval;
-    static int setted_keepalive_request_num;
+    static __thread uint64_t keepalive_request_interval;
+    static __thread int setted_keepalive_request_num;
     // static std::function<void(Socket *sk)> release_socket_callback;
     // static std::function<void(Socket *sk)> create_socket_callback;
     // static std::function<bool(FiveTuples ft, Socket *sk)> checkvalid_socket_callback;
-    static void(*release_socket_callback)(Socket *sk);
-    static void(*create_socket_callback)(Socket *sk);
-    static bool(*checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
-    static bool global_tcp_rst;
-    static uint8_t tos;
-    static bool use_http;
-    static uint16_t global_mss;
-    static bool constructing_opt_tmeplate;
+    static __thread void(*release_socket_callback)(Socket *sk);
+    static __thread void(*create_socket_callback)(Socket *sk);
+    static __thread bool(*checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
+    static __thread bool global_tcp_rst;
+    static __thread uint8_t tos;
+    static __thread bool use_http;
+    static __thread uint16_t global_mss;
+    static __thread bool constructing_opt_tmeplate;
 
     TCP() : state(TCP_CLOSE), L4_Protocol(){};
     ProtocolCode name() override { return ProtocolCode::PTC_TCP; }

@@ -1,5 +1,7 @@
 #include "dpdk.h"
 #include "dpdk_config.h"
+#include "dpdk/divert/fdir.h"
+#include "dpdk/divert/rss.h"
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -128,9 +130,13 @@ int dpdk_init(struct dpdk_config *cfg, char *argv0)
         return -1;
     }
 
-    g_config_percore = new dpdk_config_percore(cfg);
+    if(cfg->num_lcores == 1){
+        g_config_percore = new dpdk_config_percore(cfg);
+        net_stats_init();
+    }
+    if(cfg->use_rss) rss_init();
+    if(cfg->use_fdir) fdir_init(cfg);
 
-    net_stats_init();
 
     return 0;
     // if (kni_start() < 0) {
@@ -138,12 +144,41 @@ int dpdk_init(struct dpdk_config *cfg, char *argv0)
     //     return -1;
     // }
 
-    // rss_init();
 
     // tick_init(cfg->ticks_per_sec);
     // config_set_tsc(cfg, g_tsc_per_second);
 }
 
-void dpdk_exit()
+struct dpdk_lcore_thread
 {
+    int (*lcore_main)(void*);
+    void* data;
+};
+
+int dpdk_run_thread(void* thd)
+{
+    dpdk_lcore_thread* thread = (dpdk_lcore_thread*)thd;
+    g_config_percore = new dpdk_config_percore(g_config);
+    net_stats_init();
+    return thread->lcore_main(thread->data);
+}
+
+void dpdk_run(int (*lcore_main)(void*), void* data)
+{
+    int lcore_id = 0;
+
+    RTE_LCORE_FOREACH(lcore_id) {
+        if (lcore_id == 0) {
+            continue;
+        }
+        dpdk_lcore_thread* thd = new dpdk_lcore_thread();
+        thd->lcore_main = lcore_main;
+        thd->data = data;
+        rte_eal_remote_launch(dpdk_run_thread, (void*)thd, lcore_id);
+    }
+    
+    g_config_percore = new dpdk_config_percore(g_config);
+    net_stats_init();
+    lcore_main(data);
+    rte_eal_mp_wait_lcore();
 }

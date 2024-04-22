@@ -37,7 +37,7 @@ dpdk_config_user usrconfig = {
     .queue_num_per_port = {1},
     .always_accurate_time = false,
     .tx_burst_size = 8,
-    .rx_burst_size = 2048,
+    .rx_burst_size = 8,
 };
 
 dpdk_config config = dpdk_config(&usrconfig);
@@ -56,7 +56,7 @@ void config_ip_variables()
 
 void config_tcp_variables()
 {
-    TCP::keepalive_request_interval = 20 * 1000;
+    TCP::keepalive_request_interval = 12 * 1000;
     TCP::flood = 0;
     TCP::server = 1;
     // TCP::send_window = SEND_WINDOW_DEFAULT;
@@ -70,7 +70,7 @@ void config_tcp_variables()
     /* tsc */
     TCP::setted_keepalive_request_num = 50; // client
     TCP::release_socket_callback = [](Socket *sk)
-    { ((TCP*)sk->l4_protocol)->state = TCP_CLOSE; };
+    { ((TCP *)sk->l4_protocol)->state = TCP_CLOSE; };
     TCP::create_socket_callback = [](Socket *sk)
     { tcp_validate_socket(sk); };
     TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
@@ -119,12 +119,12 @@ void config_socket()
 
 void config_template_pkt()
 {
-    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", config.ports[0].id, 0);
+    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", g_config_percore->port_id, g_config_percore->queue_id);
     mbuf_template_pool_setby_socket(template_tcp_data, template_socket, data, strlen(data));
-    template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", config.ports[0].id, 0);
+    template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", g_config_percore->port_id, g_config_percore->queue_id);
     mbuf_template_pool_setby_socket(template_tcp_pkt, template_socket, nullptr, 0);
     TCP::constructing_opt_tmeplate = true;
-    template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_opt", config.ports[0].id, 0);
+    template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_opt", g_config_percore->port_id, g_config_percore->queue_id);
     mbuf_template_pool_setby_socket(template_tcp_opt, template_socket, nullptr, 0);
 }
 
@@ -133,7 +133,7 @@ void init_sockets()
     ip4addr_t base_src = ip4addr_t("10.233.1.0");
     ip4addr_t base_dst = ip4addr_t("10.234.1.0");
     srand_(2024);
-    for(int i = 0; i < 10000000; i++)
+    for (int i = 0; i < 10000000; i++)
     {
         Socket *socket = tcp_new_socket(template_socket);
         socket->src_port = rand_() % 20 + 1;

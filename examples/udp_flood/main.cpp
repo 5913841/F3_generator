@@ -82,7 +82,7 @@ void config_socket()
 
 void config_template_pkt()
 {
-    template_udp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_udp_pkt", config.ports[0].id, 0);
+    template_udp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_udp_pkt", g_config_percore->port_id, g_config_percore->queue_id);
     mbuf_template_pool_setby_socket(template_udp_pkt, template_socket, data, strlen(data));
 }
 

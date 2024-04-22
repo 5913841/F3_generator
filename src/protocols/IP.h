@@ -12,7 +12,7 @@ extern __thread uint32_t ip_id;
 
 class IPV4;
 
-extern IPV4 *parser_ipv4;
+extern thread_local IPV4 *parser_ipv4;
 
 class IPV4 : public L3_Protocol
 {

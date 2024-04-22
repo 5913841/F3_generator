@@ -115,12 +115,12 @@ void config_socket()
 
 void config_template_pkt()
 {
-    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", config.ports[0].id, 0);
+    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", g_config_percore->port_id, g_config_percore->queue_id);
     mbuf_template_pool_setby_socket(template_tcp_data, template_socket, data, strlen(data));
-    template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", config.ports[0].id, 0);
+    template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", g_config_percore->port_id, g_config_percore->queue_id);
     mbuf_template_pool_setby_socket(template_tcp_pkt, template_socket, nullptr, 0);
     TCP::constructing_opt_tmeplate = true;
-    template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_opt", config.ports[0].id, 0);
+    template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_opt", g_config_percore->port_id, g_config_percore->queue_id);
     mbuf_template_pool_setby_socket(template_tcp_opt, template_socket, nullptr, 0);
 }
 

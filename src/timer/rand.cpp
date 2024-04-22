@@ -1,10 +1,10 @@
 #include "timer/rand.h"
 #include <random>
 
-uint32_t x = 998244353;
-uint32_t y = 1366482745;
-uint32_t z = 1508893039;
-uint32_t w = 1812191717;
+thread_local uint32_t x = 998244353;
+thread_local uint32_t y = 1366482745;
+thread_local uint32_t z = 1508893039;
+thread_local uint32_t w = 1812191717;
 
 uint64_t splitmix64(uint64_t& seed)
 {

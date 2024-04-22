@@ -3,6 +3,7 @@
 #include "common/define.h"
 #include "dpdk/mbuf.h"
 #include "dpdk/bond/bond.h"
+#include "dpdk/divert/rss.h"
 
 #include <rte_ethdev.h>
 #include <rte_version.h>
@@ -126,12 +127,12 @@ int port_config(dpdk_config *cfg, struct netif_port *port)
         }
     }
 
-    // if (cfg->rss) {
-    //     if (rss_config_port(&g_port_conf, &dev_info) < 0) {
-    //         printf("Error: rss config port error\n");
-    //         return -1;
-    //     }
-    // }
+    if (cfg->use_rss) {
+        if (rss_config_port(&g_port_conf, &dev_info) < 0) {
+            printf("Error: rss config port error\n");
+            return -1;
+        }
+    }
 
     if (cfg->jumbo)
     {
