@@ -106,11 +106,11 @@ static uint32_t rss_hash_socket_ipv4(Socket *sk)
     int len = 2;
     struct rte_ipv4_tuple tuple;
 
-    tuple.src_addr = sk->src_addr;
-    tuple.dst_addr = sk->dst_addr;
+    tuple.src_addr = ntohl(sk->dst_addr);
+    tuple.dst_addr = ntohl(sk->src_addr);
     if (g_config->rss_type == RSS_L3L4) {
-        tuple.dport = sk->dst_port;
-        tuple.sport = sk->src_port;
+        tuple.dport = sk->src_port;
+        tuple.sport = sk->dst_port;
         len++;
     }
 

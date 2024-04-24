@@ -9,10 +9,11 @@
 #include "protocols/IP.h"
 #include "protocols/TCP.h"
 #include "protocols/HTTP.h"
-#include "socket/socket_table/parallel_socket_table.h"
-// #include "socket/socket_table/socket_table.h"
+// #include "socket/socket_table/parallel_socket_table.h"
+#include "socket/socket_table/socket_table.h"
 #include "socket/socket_tree/socket_tree.h"
 #include "protocols/base_protocol.h"
+#include "dpdk/divert/rss.h"
 #include <rte_lcore.h>
 
 // #define RTE_PKTMBUF_HEADROOM 256
@@ -27,18 +28,21 @@ thread_local mbuf_cache *template_tcp_data = new mbuf_cache();
 thread_local mbuf_cache *template_tcp_opt = new mbuf_cache();
 thread_local mbuf_cache *template_tcp_pkt = new mbuf_cache();
 thread_local const char *data;
-ParallelSocketPointerTable *socket_table = new ParallelSocketPointerTable();
+thread_local SocketPointerTable *socket_table = new SocketPointerTable();
 
 ip4addr_t target_ip("10.233.1.1");
 
 dpdk_config_user usrconfig = {
-    .lcores = {0},
+    .lcores = {0, 1},
     .ports = {"0000:01:00.1"},
     .gateway_for_ports = {"90:e2:ba:87:62:98"},
-    .queue_num_per_port = {1},
+    .queue_num_per_port = {2},
     .always_accurate_time = false,
+    .flow_distribution_strategy = "rss",
+    .rss_type = "l3",
+    .mq_rx_rss = true,
     .tx_burst_size = 8,
-    .rx_burst_size = 2048,
+    .rx_burst_size = 8,
 };
 
 dpdk_config config = dpdk_config(&usrconfig);
@@ -118,12 +122,12 @@ void config_socket()
 
 void config_template_pkt()
 {
-    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", config.ports[0].id, 0);
+    template_tcp_data->mbuf_pool = mbuf_pool_create(&config, (std::string("template_tcp_data") + std::to_string(g_config_percore->lcore_id)).c_str(), g_config_percore->port_id, g_config_percore->queue_id);
     mbuf_template_pool_setby_socket(template_tcp_data, template_socket, data, strlen(data));
-    template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", config.ports[0].id, 0);
+    template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, (std::string("template_tcp_pkt") + std::to_string(g_config_percore->lcore_id)).c_str(), g_config_percore->port_id, g_config_percore->queue_id);
     mbuf_template_pool_setby_socket(template_tcp_pkt, template_socket, nullptr, 0);
     TCP::constructing_opt_tmeplate = true;
-    template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_opt", config.ports[0].id, 0);
+    template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, (std::string("template_tcp_opt") + std::to_string(g_config_percore->lcore_id)).c_str(), g_config_percore->port_id, g_config_percore->queue_id);
     mbuf_template_pool_setby_socket(template_tcp_opt, template_socket, nullptr, 0);
 }
 
@@ -155,19 +159,18 @@ int start_test(__rte_unused void *arg1)
         //     break;
         // }
 
-        if (dpdk_config_percore::check_epoch_timer(0.0000007 * TSC_PER_SEC))
+        if (dpdk_config_percore::check_epoch_timer(0.000007 * TSC_PER_SEC))
         {
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 7; i++)
             {
                 Socket *socket = tcp_new_socket(template_socket);
-
+rerand:
                 socket->dst_port = rand() % 20 + 1;
                 socket->src_port = rand();
                 socket->src_addr = rand() % 11 + base_src;
-                if (socket_table->insert_socket(socket) == -1)
+                if (!rss_check_socket(socket) || socket_table->insert_socket(socket) == -1)
                 {
-                    tcp_release_socket(socket);
-                    continue;
+                    goto rerand;
                 }
                 tcp_validate_csum(socket);
                 tcp_launch(socket);
