@@ -202,6 +202,7 @@ struct SocketPointerEqual
                s1->l3_protocol->name() == s2->l3_protocol->name() &&
                s1->l4_protocol->name() == s2->l4_protocol->name() &&
                s1->l5_protocol->name() == s2->l5_protocol->name();
+        // return true;
     }
 };
 

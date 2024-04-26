@@ -26,12 +26,33 @@ public:
         return *it;
     }
 
+    Socket *find_socket(Socket *socket, size_t hash_value)
+    {
+        auto it = socket_table.find(socket, hash_value);
+        if (it == socket_table.end())
+        {
+            return nullptr;
+        }
+        // last_find_socket_table_it = it;
+        return *it;
+    }
+
     Socket *find_socket(FiveTuples ft);
 
     int insert_socket(Socket *socket)
     {
         auto it = socket_table.insert(socket);
         if (it.second == false)
+        {
+            return -1;
+        }
+        return 0;
+    }
+
+    int insert_socket(Socket *socket, size_t hash_value)
+    {
+        auto it = socket_table.emplace_with_hash(hash_value, socket);
+        if(it.second == false)
         {
             return -1;
         }
@@ -45,6 +66,18 @@ public:
         {
             return -1;
         }
+        return 0;
+    }
+
+    int remove_socket(Socket *socket, size_t hash_value)
+    {
+        auto it = socket_table.find(socket, hash_value);
+        if (it == socket_table.end())
+        {
+            return -1;
+        }
+        // last_find_socket_table_it = it;
+        socket_table.erase(it);
         return 0;
     }
 };
