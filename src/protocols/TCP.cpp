@@ -7,6 +7,7 @@
 #include "panel/panel.h"
 #include <random>
 #include "timer/rand.h"
+#include "socket/socket_table/socket_table.h"
 
 
 __thread bool TCP::flood;
@@ -24,14 +25,15 @@ __thread int TCP::setted_keepalive_request_num;
 // std::function<void(Socket *sk)> TCP::release_socket_callback;
 // std::function<void(Socket *sk)> TCP::create_socket_callback;
 // std::function<bool(FiveTuples ft, Socket *sk)> TCP::checkvalid_socket_callback;
-__thread void (*TCP::release_socket_callback)(Socket *sk);
-__thread void (*TCP::create_socket_callback)(Socket *sk);
-__thread bool (*TCP::checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
+// __thread void (*TCP::release_socket_callback)(Socket *sk);
+// __thread void (*TCP::create_socket_callback)(Socket *sk);
+// __thread bool (*TCP::checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
 __thread bool TCP::global_tcp_rst;
 __thread uint8_t TCP::tos;
 __thread bool TCP::use_http;
 __thread uint16_t TCP::global_mss;
 __thread bool TCP::constructing_opt_tmeplate;
+thread_local SocketPointerTable* TCP::socket_table = new SocketPointerTable();
 
 thread_local TCP *parser_tcp = new TCP();
 
@@ -43,22 +45,10 @@ extern void tcp_start_retransmit_timer(Socket *sk, uint64_t now_tsc);
 extern void tcp_start_timeout_timer(Socket *sk, uint64_t now_tsc);
 extern void tcp_start_keepalive_timer(Socket *sk, uint64_t now_tsc);
 
-bool tcp_seq_lt(uint32_t a, uint32_t b)
-{
-    return 0 < (b - a) && (b - a) < 0x80000000;
-}
-bool tcp_seq_le(uint32_t a, uint32_t b)
-{
-    return (b - a) < 0x80000000;
-}
-bool tcp_seq_gt(uint32_t a, uint32_t b)
-{
-    return 0 < (a - b) && (a - b) < 0x80000000;
-}
-bool tcp_seq_ge(uint32_t a, uint32_t b)
-{
-    return (a - b) < 0x80000000;
-}
+#define tcp_seq_lt(seq0, seq1)    ((int)((seq0) - (seq1)) < 0)
+#define tcp_seq_le(seq0, seq1)    ((int)((seq0) - (seq1)) <= 0)
+#define tcp_seq_gt(seq0, seq1)    ((int)((seq0) - (seq1)) > 0)
+#define tcp_seq_ge(seq0, seq1)    ((int)((seq0) - (seq1)) >= 0)
 
 bool tcp_state_before_established(uint8_t state)
 {
@@ -150,7 +140,7 @@ static inline void tcp_flags_tx_count(uint8_t tcp_flags)
     }
 }
 
-inline struct rte_mbuf *tcp_new_packet(struct Socket *sk, uint8_t tcp_flags)
+static inline struct rte_mbuf *tcp_new_packet(struct Socket *sk, uint8_t tcp_flags)
 {
     // uint16_t csum_ip = 0;
     uint16_t csum_tcp = 0;
@@ -219,23 +209,23 @@ inline struct rte_mbuf *tcp_new_packet(struct Socket *sk, uint8_t tcp_flags)
     return m;
 }
 
-inline void tcp_send_packet(rte_mbuf *m, struct Socket *sk)
+static inline void tcp_send_packet(rte_mbuf *m, struct Socket *sk)
 {
-    TCP *tcp = &sk->tcp;
     csum_offload_ip_tcpudp(m, RTE_MBUF_F_TX_TCP_CKSUM);
     dpdk_config_percore::cfg_send_packet(m);
 }
 
-static void tcp_socket_close(struct Socket *sk)
+static inline void tcp_socket_close(struct Socket *sk)
 {
     TCP *tcp = &sk->tcp;
     unique_queue_del(&tcp->timer);
     // if (tcp->state != TCP_CLOSE)
     // {
-        tcp->state = TCP_CLOSE;
-        /* don't clear sequences in TIME-WAIT */
-        tcp->release_socket_callback(sk);
-        net_stats_socket_close();
+    tcp->state = TCP_CLOSE;
+    /* don't clear sequences in TIME-WAIT */
+    // tcp->release_socket_callback(sk);
+    TCP::socket_table->remove_socket(sk); tcp_release_socket(sk);
+    net_stats_socket_close();
 #ifdef DEBUG_
     printf("Thread: %d, tcp_close_socket: %p\n", g_config_percore->lcore_id, sk);
 #endif
@@ -253,7 +243,7 @@ static inline void tcp_process_rst(struct Socket *sk, struct rte_mbuf *m)
     mbuf_free2(m);
 }
 
-inline bool tcp_in_duration()
+static inline bool tcp_in_duration()
 {
     if ((current_ts_msec() < (uint64_t)(TCP::global_duration_time)) && (TCP::global_stop == false))
     {
@@ -535,7 +525,7 @@ struct rte_mbuf *tcp_reply(struct Socket *sk, uint8_t tcp_flags)
     return m;
 }
 
-static void tcp_rst_set_tcp(struct tcphdr *th)
+static inline void tcp_rst_set_tcp(struct tcphdr *th)
 {
     uint32_t seq = 0;
     uint16_t sport = 0;
@@ -563,7 +553,7 @@ static void tcp_rst_set_tcp(struct tcphdr *th)
     th->th_flags = TH_RST | TH_ACK;
 }
 
-static void tcp_rst_set_ip(struct iphdr *iph)
+static inline void tcp_rst_set_ip(struct iphdr *iph)
 {
     uint32_t saddr = 0;
     uint32_t daddr = 0;
@@ -583,7 +573,7 @@ static void tcp_rst_set_ip(struct iphdr *iph)
     iph->daddr = htonl(daddr);
 }
 
-inline void tcp_reply_rst(Socket *sk, struct ether_header *eth, struct iphdr *iph, struct tcphdr *th, rte_mbuf *m, int olen)
+static inline void tcp_reply_rst(Socket *sk, struct ether_header *eth, struct iphdr *iph, struct tcphdr *th, rte_mbuf *m, int olen)
 {
     TCP *tcp = &sk->tcp;
     int nlen = 0;
@@ -617,6 +607,7 @@ inline void tcp_reply_rst(Socket *sk, struct ether_header *eth, struct iphdr *ip
     net_stats_rst_tx();
     tcp_send_packet(m, sk);
 }
+
 static inline uint8_t *tcp_data_get(struct iphdr *iph, struct tcphdr *th, uint16_t *data_len)
 {
     struct ip6_hdr *ip6h = (struct ip6_hdr *)iph;
@@ -644,7 +635,7 @@ static inline uint8_t *tcp_data_get(struct iphdr *iph, struct tcphdr *th, uint16
     return data;
 }
 
-inline void tcp_stop_retransmit_timer(TCP *tcp)
+static inline void tcp_stop_retransmit_timer(TCP *tcp)
 {
     tcp->retrans = 0;
     if (tcp->snd_nxt == tcp->snd_una)
@@ -806,7 +797,7 @@ static inline bool tcp_check_sequence(struct Socket *sk, struct tcphdr *th, uint
     return false;
 }
 
-inline void tcp_server_process_syn(struct Socket *sk, struct rte_mbuf *m, struct tcphdr *th)
+static inline void tcp_server_process_syn(struct Socket *sk, struct rte_mbuf *m, struct tcphdr *th)
 {
 #ifdef DEBUG_
     printf("Thread: %d, tcp_server_process_syn: %p\n", g_config_percore->lcore_id, sk);
@@ -820,7 +811,8 @@ inline void tcp_server_process_syn(struct Socket *sk, struct rte_mbuf *m, struct
 
     if (tcp->state == TCP_CLOSE || tcp->state == TCP_LISTEN)
     {
-        tcp->create_socket_callback(sk);
+        // tcp->create_socket_callback(sk);
+        TCP::socket_table->insert_socket(sk); tcp_validate_socket(sk); tcp_validate_csum(sk);
         net_stats_socket_open();
         tcp->state = TCP_SYN_RECV;
         tcp->retrans = 0;
@@ -848,14 +840,15 @@ inline void tcp_server_process_syn(struct Socket *sk, struct rte_mbuf *m, struct
         // SOCKET_LOG_ENABLE(sk);
         // MBUF_LOG(m, "drop-syn");
         // SOCKET_LOG(sk, "drop-bad-syn");
-        tcp->release_socket_callback(sk);
+        // tcp->release_socket_callback(sk);
+        TCP::socket_table->remove_socket(sk); tcp_release_socket(sk);
         net_stats_tcp_drop();
     }
 
     mbuf_free2(m);
 }
 
-inline void tcp_client_process_syn_ack(struct Socket *sk,
+static inline void tcp_client_process_syn_ack(struct Socket *sk,
                                        struct rte_mbuf *m, struct tcphdr *th)
 {
     TCP *tcp = &sk->tcp;
@@ -901,7 +894,7 @@ inline void tcp_client_process_syn_ack(struct Socket *sk,
     mbuf_free2(m);
 }
 
-inline uint8_t tcp_process_fin(struct Socket *sk, uint8_t rx_flags, uint8_t tx_flags)
+static inline uint8_t tcp_process_fin(struct Socket *sk, uint8_t rx_flags, uint8_t tx_flags)
 {
 #ifdef DEBUG_
     printf("Thread: %d, tcp_process_fin: %p\n", g_config_percore->lcore_id, sk);
@@ -977,7 +970,8 @@ static inline void tcp_server_process_data(struct Socket *sk, struct rte_mbuf *m
 
     if (tcp->state == TCP_CLOSE)
     {
-        tcp->release_socket_callback(sk);
+        // tcp->release_socket_callback(sk);
+        TCP::socket_table->remove_socket(sk); tcp_release_socket(sk);
         net_stats_tcp_drop();
         mbuf_free2(m);
     }
@@ -1061,7 +1055,7 @@ static inline void tcp_server_process_data(struct Socket *sk, struct rte_mbuf *m
     mbuf_free2(m);
 }
 
-inline void tcp_server_process(Socket *sk, ether_header *eth_hdr, iphdr *ip_hdr, tcphdr *tcp_hdr, rte_mbuf *data, int olen)
+static inline void tcp_server_process(Socket *sk, ether_header *eth_hdr, iphdr *ip_hdr, tcphdr *tcp_hdr, rte_mbuf *data, int olen)
 {
     uint8_t flags = tcp_hdr->th_flags;
     tcp_flags_rx_count(flags);
@@ -1162,9 +1156,10 @@ static inline void tcp_client_process_data(struct Socket *sk, struct rte_mbuf *m
     mbuf_free2(m);
 }
 
-inline void tcp_client_process(Socket *sk, ether_header *eth_hdr, iphdr *ip_hdr, tcphdr *tcp_hdr, rte_mbuf *data, int olen)
+static inline void tcp_client_process(Socket *sk, ether_header *eth_hdr, iphdr *ip_hdr, tcphdr *tcp_hdr, rte_mbuf *data, int olen)
 {
     uint8_t flags = tcp_hdr->th_flags;
+    tcp_flags_rx_count(flags);
 
     if (((flags & (TH_SYN | TH_RST)) == 0) && (flags & TH_ACK))
     {

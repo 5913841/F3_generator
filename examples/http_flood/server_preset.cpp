@@ -72,11 +72,11 @@ void config_tcp_variables()
     TCP::keepalive_request_interval = 1000;
     TCP::setted_keepalive_request_num = 0; // client
     TCP::release_socket_callback = [](Socket *sk)
-    { ((TCP*)sk->l4_protocol)->state = TCP_CLOSE; };
+    { (sk->tcp).state = TCP_CLOSE; };
     TCP::create_socket_callback = [](Socket *sk)
     { tcp_validate_socket(sk); };
     TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
-    { return ((TCP*)sk->l4_protocol)->state != TCP_CLOSE; };
+    { return (sk->tcp).state != TCP_CLOSE; };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;

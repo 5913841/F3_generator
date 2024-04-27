@@ -9,6 +9,7 @@
 #include "timer/rand.h"
 #include "timer/unique_timer.h"
 
+struct SocketPointerTable;
 struct FiveTuples;
 
 bool tcp_seq_lt(uint32_t a, uint32_t b);
@@ -61,14 +62,15 @@ public:
     // static std::function<void(Socket *sk)> release_socket_callback;
     // static std::function<void(Socket *sk)> create_socket_callback;
     // static std::function<bool(FiveTuples ft, Socket *sk)> checkvalid_socket_callback;
-    static __thread void(*release_socket_callback)(Socket *sk);
-    static __thread void(*create_socket_callback)(Socket *sk);
-    static __thread bool(*checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
+    // static __thread void(*release_socket_callback)(Socket *sk);
+    // static __thread void(*create_socket_callback)(Socket *sk);
+    // static __thread bool(*checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
     static __thread bool global_tcp_rst;
     static __thread uint8_t tos;
     static __thread bool use_http;
     static __thread uint16_t global_mss;
     static __thread bool constructing_opt_tmeplate;
+    static thread_local SocketPointerTable* socket_table;
 
     static tcphdr *decode_hdr_pre(rte_mbuf *data)
     {

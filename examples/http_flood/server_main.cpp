@@ -26,7 +26,7 @@ mbuf_cache *template_tcp_data = new mbuf_cache();
 mbuf_cache *template_tcp_opt = new mbuf_cache();
 mbuf_cache *template_tcp_pkt = new mbuf_cache();
 const char *data;
-SocketPointerTable *socket_table = new SocketPointerTable();
+// SocketPointerTable *socket_table = new SocketPointerTable();
 
 
 ip4addr_t target_ip("10.233.1.1");
@@ -68,12 +68,12 @@ void config_tcp_variables()
     /* tsc */
     TCP::keepalive_request_interval = 1000;
     TCP::setted_keepalive_request_num = 0; // client
-    TCP::release_socket_callback = [](Socket *sk)
-    { socket_table->remove_socket(sk); tcp_release_socket(sk); };
-    TCP::create_socket_callback = [](Socket *sk)
-    { socket_table->insert_socket(sk); tcp_validate_socket(sk); tcp_validate_csum(sk);};
-    TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
-    { return socket_table->find_socket(ft) == sk; };
+    // TCP::release_socket_callback = [](Socket *sk)
+    // { socket_table->remove_socket(sk); tcp_release_socket(sk); };
+    // TCP::create_socket_callback = [](Socket *sk)
+    // { socket_table->insert_socket(sk); tcp_validate_socket(sk); tcp_validate_csum(sk);};
+    // TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
+    // { return socket_table->find_socket(ft) == sk; };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;
@@ -145,7 +145,7 @@ int start_test(__rte_unused void *arg1)
         if (m != nullptr)
         {
             parse_packet(m, parser_socket);
-            Socket *socket = socket_table->find_socket(parser_socket);
+            Socket *socket = TCP::socket_table->find_socket(parser_socket);
             if(socket == nullptr)
             {
                 socket = tcp_new_socket(template_socket);

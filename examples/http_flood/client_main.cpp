@@ -26,7 +26,7 @@ mbuf_cache *template_tcp_data = new mbuf_cache();
 mbuf_cache *template_tcp_opt = new mbuf_cache();
 mbuf_cache *template_tcp_pkt = new mbuf_cache();
 const char *data;
-SocketPointerTable *socket_table = new SocketPointerTable();
+// SocketPointerTable *socket_table = new SocketPointerTable();
 
 ip4addr_t target_ip("10.233.1.1");
 
@@ -68,10 +68,10 @@ void config_tcp_variables()
     TCP::global_stop = false;
     /* tsc */
     TCP::setted_keepalive_request_num = 0; // client
-    TCP::release_socket_callback = [](Socket *sk)
-    { socket_table->remove_socket(sk); tcp_release_socket(sk); };
-    TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
-    { return socket_table->find_socket(ft) == sk; };
+    // TCP::release_socket_callback = [](Socket *sk)
+    // { socket_table->remove_socket(sk); tcp_release_socket(sk); };
+    // TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
+    // { return socket_table->find_socket(ft) == sk; };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;
@@ -143,7 +143,7 @@ int start_test(__rte_unused void *arg1)
                 break;
             }
             parse_packet(m, parser_socket);
-            Socket *socket = socket_table->find_socket(parser_socket);
+            Socket *socket = TCP::socket_table->find_socket(parser_socket);
             if (socket != nullptr)
                 socket->tcp.process(socket, m);
         } while (true);
@@ -164,7 +164,7 @@ int start_test(__rte_unused void *arg1)
                 socket->dst_port = rand() % 20 + 1;
                 socket->src_port = rand();
                 socket->src_addr = rand() % 11 + base_src;
-                if (socket_table->insert_socket(socket) == -1)
+                if (TCP::socket_table->insert_socket(socket) == -1)
                 {
                     tcp_release_socket(socket);
                     continue;

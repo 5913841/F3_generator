@@ -73,9 +73,9 @@ void config_tcp_variables()
     /* tsc */
     TCP::setted_keepalive_request_num = 0; // client
     TCP::release_socket_callback = [](Socket *sk)
-    { socket_table->remove_socket(sk); ((TCP*)sk->l4_protocol)->state = TCP_CLOSE; };
+    { socket_table->remove_socket(sk); (sk->tcp).state = TCP_CLOSE; };
     TCP::checkvalid_socket_callback = [](FiveTuples ft, Socket *sk)
-    { return ((TCP*)sk->l4_protocol)->state != TCP_CLOSE; };
+    { return (sk->tcp).state != TCP_CLOSE; };
     TCP::global_tcp_rst = true;
     TCP::tos = 0x00;
     TCP::use_http = true;
