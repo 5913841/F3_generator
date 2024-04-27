@@ -1,6 +1,8 @@
 #include "dpdk/mbuf_template.h"
 
-int mbuf_template_pool_setby_socket(mbuf_cache *mp, Socket *socket, const void *data, size_t len)
+
+
+int mbuf_template_pool_setby_constructors(mbuf_cache *mp, Socket* socket, constructor* constructors, const void *data, size_t len)
 {
     rte_mbuf *m = rte_pktmbuf_alloc(mp->mbuf_pool);
     rte_pktmbuf_append(m, len);
@@ -9,9 +11,9 @@ int mbuf_template_pool_setby_socket(mbuf_cache *mp, Socket *socket, const void *
     mp->data.data_len = len;
     for (int i = 3; i >= 0; i--)
     {
-        if (socket->protocols[i] == nullptr)
+        if (constructors[i] == nullptr)
             continue;
-        int h_len = socket->protocols[i]->construct(socket, m);
+        int h_len = constructors[i](socket, m);
         len += h_len;
         if (i == SOCKET_L2)
         {

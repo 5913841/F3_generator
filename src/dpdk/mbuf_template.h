@@ -8,7 +8,8 @@
 #include <rte_version.h>
 #include "dpdk/mbuf.h"
 #include "common/define.h"
-#include "socket/socket.h"
+
+struct Socket;
 
 struct mbuf_data
 {
@@ -20,6 +21,8 @@ struct mbuf_data
     uint16_t data_len;
     uint16_t total_len;
 };
+
+typedef int(*constructor)(Socket*, rte_mbuf*);
 
 struct mbuf_cache
 {
@@ -72,7 +75,7 @@ static inline struct rte_mbuf *mbuf_cache_alloc(struct mbuf_cache *p)
     return m;
 }
 
-int mbuf_template_pool_setby_socket(mbuf_cache *mp, Socket *socket, const void *data, size_t len);
+int mbuf_template_pool_setby_constructors(mbuf_cache *mp, Socket* socket, constructor* constructors, const void *data, size_t len);
 
 int mbuf_template_pool_setby_packet(mbuf_cache *mp, rte_mbuf *pkt);
 

@@ -6,7 +6,6 @@
 #include <rte_mbuf.h>
 #include <rte_common.h>
 #include "dpdk/dpdk_config.h"
-#include "protocols/base_protocol.h"
 #include "dpdk/mbuf_template.h"
 #include "timer/unique_timer.h"
 
@@ -15,10 +14,9 @@ int udp_launch(Socket *socket);
 struct rte_mbuf *udp_send(Socket *socket);
 char *udp_get_payload();
 
-struct UDP : public L4_Protocol
+struct UDP
 {
 public:
-    UDP() : state(TCP_CLOSE), L4_Protocol(){};
     Socket *socket;
     UniqueTimer timer;
     uint8_t state;
@@ -33,7 +31,6 @@ public:
     static __thread bool global_stop;
     static __thread bool payload_random;
     static __thread uint64_t keepalive_request_interval;
-    ProtocolCode name() override { return ProtocolCode::PTC_UDP; }
 
     static udphdr *decode_hdr_pre(rte_mbuf *data)
     {
@@ -44,11 +41,7 @@ public:
     {
         return sizeof(struct udphdr);
     }
-    
-    size_t hash() override
-    {
-        return std::hash<uint8_t>()(PTC_UDP);
-    }
+
 
     int process(Socket *socket, rte_mbuf *data)
     {

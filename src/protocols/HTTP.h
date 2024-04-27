@@ -1,7 +1,6 @@
 #ifndef HTTP_H
 #define HTTP_H
 
-#include "protocols/base_protocol.h"
 #include "protocols/TCP.h"
 #include "timer/clock.h"
 #include "dpdk/dpdk_config.h"
@@ -36,7 +35,7 @@ enum
     HTTP_ERROR
 };
 
-class HTTP : public L5_Protocol
+class HTTP
 {
 public:
     // #ifdef HTTP_PARSE
@@ -59,40 +58,12 @@ public:
         struct Socket *sockets[HTTP_ACK_DELAY_MAX];
     } ack_delay;
     // #endif
-    HTTP() : L5_Protocol() {}
-    ProtocolCode name() override { return ProtocolCode::PTC_HTTP; }
-    inline size_t get_hdr_len(Socket *socket, rte_mbuf *data)
-    {
-        return 0;
-    }
-    size_t hash() override
-    {
-        return std::hash<uint8_t>()(PTC_HTTP);
-    }
     inline int construct(Socket *socket, rte_mbuf *data)
     {
         return 0;
     }
     inline void process(Socket *socket, rte_mbuf *data)
     {
-    }
-
-    static int parse_packet_ft(rte_mbuf *data, FiveTuples *ft, int offset)
-    {
-        ft->protocol_codes[SOCKET_L5] = ProtocolCode::PTC_HTTP;
-        return 0;
-    }
-
-    static int parse_packet_sk(rte_mbuf *data, Socket *sk, int offset)
-    {
-        sk->l5_protocol = parser_http;
-        return 0;
-    }
-
-    static void parser_init()
-    {
-        L5_Protocol::parser.add_parser(parse_packet_ft);
-        L5_Protocol::parser.add_parser(parse_packet_sk);
     }
 };
 
@@ -129,23 +100,7 @@ const char *http_get_response(void);
 // #ifdef HTTP_PARSE
 int http_ack_delay_flush();
 
-static inline void http_ack_delay_add(struct Socket *sk)
-{
-    HTTP *http = (HTTP *)sk->l5_protocol;
-    if (http->http_ack)
-    {
-        return;
-    }
-
-    if (HTTP::ack_delay.next >= HTTP_ACK_DELAY_MAX)
-    {
-        http_ack_delay_flush();
-    }
-
-    HTTP::ack_delay.sockets[HTTP::ack_delay.next] = sk;
-    HTTP::ack_delay.next++;
-    http->http_ack = 1;
-}
+void http_ack_delay_add(struct Socket *sk);
 
 // #ifdef HTTP_PARSE
 static inline void socket_init_http(struct HTTP *http)
@@ -172,49 +127,8 @@ static inline void socket_init_http_server(struct HTTP *http, TCP *tcp)
 
 int http_parse_run(struct Socket *sk, const uint8_t *data, int data_len);
 
-static inline uint8_t http_client_process_data(struct Socket *sk,
-                                               uint8_t rx_flags, uint8_t *data, uint16_t data_len)
-{
-    HTTP *http = (HTTP *)sk->l5_protocol;
-    TCP *tcp = (TCP *)sk->l4_protocol;
-    int ret = 0;
-    int8_t tx_flags = 0;
-
-    ret = http_parse_run(sk, data, data_len);
-    if (ret == HTTP_PARSE_OK)
-    {
-        if ((rx_flags & TH_FIN) == 0)
-        {
-            http_ack_delay_add(sk);
-            return 0;
-        }
-    }
-    else if (ret == HTTP_PARSE_END)
-    {
-        socket_init_http(http);
-        if (tcp->keepalive && ((rx_flags & TH_FIN) == 0))
-        {
-            http_ack_delay_add(sk);
-            tcp_start_keepalive_timer(sk, time_in_config());
-            return 0;
-        }
-        else
-        {
-            tx_flags |= TH_FIN;
-            http->http_ack = 0;
-        }
-    }
-    else
-    {
-        socket_init_http(http);
-        tcp->keepalive = 0;
-        http->http_length = 0;
-        tx_flags |= TH_FIN;
-        net_stats_http_error();
-    }
-
-    return TH_ACK | tx_flags;
-}
+uint8_t http_client_process_data(struct Socket *sk,
+                                               uint8_t rx_flags, uint8_t *data, uint16_t data_len);
 // #endif
 
 #endif

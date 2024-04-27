@@ -3,12 +3,13 @@
 
 // the file implements the TCP protocol based on IPv4 and ethernet, you can modify or write your own TCP protocol based on other l3 protocols.
 
-#include "protocols/base_protocol.h"
 #include <netinet/tcp.h>
 #include "dpdk/mbuf_template.h"
 #include <functional>
 #include "timer/rand.h"
 #include "timer/unique_timer.h"
+
+struct FiveTuples;
 
 bool tcp_seq_lt(uint32_t a, uint32_t b);
 bool tcp_seq_le(uint32_t a, uint32_t b);
@@ -24,11 +25,7 @@ struct tcp_opt_mss
     uint16_t mss;
 } __attribute__((__packed__));
 
-class TCP;
-
-extern thread_local TCP *parser_tcp;
-
-class TCP : public L4_Protocol
+class TCP
 {
 public:
     UniqueTimer timer;
@@ -73,86 +70,24 @@ public:
     static __thread uint16_t global_mss;
     static __thread bool constructing_opt_tmeplate;
 
-    TCP() : state(TCP_CLOSE), L4_Protocol(){};
-    ProtocolCode name() override { return ProtocolCode::PTC_TCP; }
     static tcphdr *decode_hdr_pre(rte_mbuf *data)
     {
         return rte_pktmbuf_mtod_offset(data, struct tcphdr *, -sizeof(struct tcphdr));
     }
+
     size_t get_hdr_len(Socket *socket, rte_mbuf *data)
     {
         return sizeof(struct tcphdr);
     }
-    size_t hash() override
-    {
-        return std::hash<uint8_t>()(PTC_TCP);
-    }
-    int construct(Socket *socket, rte_mbuf *data)
-    {
-        int opt_len = 0;
-        if (constructing_opt_tmeplate && global_mss != 0)
-        {
-            uint8_t wscale[4] = {1, 3, 3, DEFAULT_WSCALE};
-            rte_pktmbuf_prepend(data, 4);
-            rte_memcpy(rte_pktmbuf_mtod(data, uint8_t *), wscale, 4);
-            opt_len += 4;
-            tcp_opt_mss *opt_mss = rte_pktmbuf_mtod_offset(data, struct tcp_opt_mss *, -sizeof(struct tcp_opt_mss));
-            opt_mss->kind = 2;
-            opt_mss->len = 4;
-            opt_mss->mss = htons(global_mss);
-            opt_len += sizeof(struct tcp_opt_mss);
-            rte_pktmbuf_prepend(data, sizeof(struct tcp_opt_mss));
-        }
-        tcphdr *tcp = decode_hdr_pre(data);
-        tcp->source = socket->src_port;
-        tcp->dest = socket->dst_port;
-        tcp->seq = snd_nxt;
-        tcp->ack_seq = rcv_nxt;
-        tcp->doff = (sizeof(struct tcphdr) + opt_len) / 4;
-        tcp->fin = 0;
-        tcp->syn = 0;
-        tcp->rst = 0;
-        tcp->psh = 0;
-        tcp->ack = 0;
-        tcp->urg = 0;
-        tcp->window = snd_wnd;
-        tcp->check = 0;
-        tcp->urg_ptr = 0;
-        data->l4_len = sizeof(struct tcphdr) + opt_len;
-        rte_pktmbuf_prepend(data, sizeof(struct tcphdr));
-        return sizeof(struct tcphdr) + opt_len;
-    }
+
+    int construct(Socket *socket, rte_mbuf *data);
+
     int process(Socket *socket, rte_mbuf *data);
-
-    static int parse_packet_ft(rte_mbuf *data, FiveTuples *ft, int offset)
-    {
-        ft->protocol_codes[SOCKET_L4] = ProtocolCode::PTC_TCP;
-        tcphdr *tcp = rte_pktmbuf_mtod_offset(data, struct tcphdr *, offset);
-        ft->src_port = ntohs(tcp->dest);
-        ft->dst_port = ntohs(tcp->source);
-        return sizeof(struct tcphdr);
-    }
-
-    static int parse_packet_sk(rte_mbuf *data, Socket *sk, int offset)
-    {
-        sk->l4_protocol = parser_tcp;
-        tcphdr *tcp = rte_pktmbuf_mtod_offset(data, struct tcphdr *, offset);
-        sk->src_port = ntohs(tcp->dest);
-        sk->dst_port = ntohs(tcp->source);
-        return sizeof(struct tcphdr);
-    }
-
-    static void parser_init()
-    {
-        L4_Protocol::parser.add_parser(parse_packet_ft);
-        L4_Protocol::parser.add_parser(parse_packet_sk);
-    }
 
     static void timer_init();
 
     static void tcp_init()
     {
-        parser_init();
         srand_(rte_rdtsc());
         timer_init();
     }

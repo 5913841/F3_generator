@@ -44,13 +44,11 @@ dpdk_config config = dpdk_config(&usrconfig);
 
 void config_ether_variables()
 {
-    ETHER::parser_init();
     ether->port = config.ports + 0;
 }
 
 void config_ip_variables()
 {
-    IPV4::parser_init();
     return;
 }
 
@@ -91,7 +89,6 @@ void config_tcp_variables()
 
 void config_http_variables()
 {
-    HTTP::parser_init();
     HTTP::payload_size = 100;
     HTTP::payload_random = false;
     strcpy(HTTP::http_host, HTTP_HOST_DEFAULT);
@@ -105,25 +102,29 @@ void config_http_variables()
 
 void config_socket()
 {
+    template_socket->protocol = IPPROTO_TCP;
     template_socket->src_addr = 0;
     template_socket->dst_addr = target_ip;
     template_socket->src_port = 0;
     template_socket->dst_port = 0;
-    template_socket->set_protocol(SOCKET_L2, ether);
-    template_socket->set_protocol(SOCKET_L3, ip);
-    template_socket->set_protocol(SOCKET_L4, template_tcp);
-    template_socket->set_protocol(SOCKET_L5, template_http);
+    template_socket->tcp = *template_tcp;
+    template_socket->http = *template_http;
 }
 
 void config_template_pkt()
 {
+    constructor constructors[4];
+    constructors[0] = [](Socket *sk, rte_mbuf *m){return ether->construct(sk, m);};
+    constructors[1] = [](Socket *sk, rte_mbuf *m){return ip->construct(sk, m);};
+    constructors[2] = [](Socket *sk, rte_mbuf *m){return template_tcp->construct(sk, m);};
+    constructors[3] = [](Socket *sk, rte_mbuf *m){return template_http->construct(sk, m);};
     template_tcp_data->mbuf_pool = mbuf_pool_create(&config, "template_tcp_data", g_config_percore->port_id, g_config_percore->queue_id);
-    mbuf_template_pool_setby_socket(template_tcp_data, template_socket, data, strlen(data));
+    mbuf_template_pool_setby_constructors(template_tcp_data, template_socket, constructors, data, strlen(data));
     template_tcp_pkt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_pkt", g_config_percore->port_id, g_config_percore->queue_id);
-    mbuf_template_pool_setby_socket(template_tcp_pkt, template_socket, nullptr, 0);
+    mbuf_template_pool_setby_constructors(template_tcp_pkt, template_socket, constructors, nullptr, 0);
     TCP::constructing_opt_tmeplate = true;
     template_tcp_opt->mbuf_pool = mbuf_pool_create(&config, "template_tcp_opt", g_config_percore->port_id, g_config_percore->queue_id);
-    mbuf_template_pool_setby_socket(template_tcp_opt, template_socket, nullptr, 0);
+    mbuf_template_pool_setby_constructors(template_tcp_opt, template_socket, constructors, nullptr, 0);
 }
 
 int start_test(__rte_unused void *arg1)
@@ -144,7 +145,7 @@ int start_test(__rte_unused void *arg1)
             parse_packet(m, parser_socket);
             Socket *socket = socket_table->find_socket(parser_socket);
             if (socket != nullptr)
-                socket->l4_protocol->process(socket, m);
+                socket->tcp.process(socket, m);
         } while (true);
         dpdk_config_percore::cfg_send_flush();
         http_ack_delay_flush();

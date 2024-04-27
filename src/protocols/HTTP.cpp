@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <sys/time.h>
+#include "socket/socket.h"
 
 #define HTTP_REQ_FORMAT     \
     "GET %s HTTP/1.1\r\n"   \
@@ -61,6 +62,24 @@ static inline int http_header_match(const uint8_t *start, int name_len, int name
     return 0;
 }
 
+void http_ack_delay_add(struct Socket *sk)
+{
+    HTTP *http = &sk->http;
+    if (http->http_ack)
+    {
+        return;
+    }
+
+    if (HTTP::ack_delay.next >= HTTP_ACK_DELAY_MAX)
+    {
+        http_ack_delay_flush();
+    }
+
+    HTTP::ack_delay.sockets[HTTP::ack_delay.next] = sk;
+    HTTP::ack_delay.next++;
+    http->http_ack = 1;
+}
+
 int http_ack_delay_flush()
 {
     int i = 0;
@@ -69,8 +88,8 @@ int http_ack_delay_flush()
     for (i = 0; i < HTTP::ack_delay.next; i++)
     {
         sk = HTTP::ack_delay.sockets[i];
-        HTTP *http = (HTTP *)sk->l5_protocol;
-        TCP *tcp = (TCP *)sk->l4_protocol;
+        HTTP *http = &sk->http;
+        TCP *tcp = &sk->tcp;
         if (http->http_ack)
         {
             http->http_ack = 0;
@@ -93,9 +112,8 @@ static inline int http_parse_header_line(struct Socket *sk, const uint8_t *start
 {
     int i = 0;
     long content_length = 0;
-    HTTP *http = (HTTP *)sk->l5_protocol;
-    TCP *tcp = (TCP *)sk->l4_protocol;
-
+    HTTP *http = &sk->http;
+    TCP *tcp = &sk->tcp;
     if (http_header_match(start, name_len, CONTENT_LENGTH_SIZE, 'C', 'c', 'h', 'H'))
     {
         content_length = atol((const char *)(start + CONTENT_LENGTH_SIZE));
@@ -151,8 +169,8 @@ static inline int http_parse_header_line(struct Socket *sk, const uint8_t *start
  * */
 static int http_parse_headers(struct Socket *sk, const uint8_t *data, int data_len)
 {
-    HTTP *http = (HTTP *)sk->l5_protocol;
-    TCP *tcp = (TCP *)sk->l4_protocol;
+    HTTP *http = &sk->http;
+    TCP *tcp = &sk->tcp;
     const uint8_t *p = NULL;
     const uint8_t *start = NULL;
     const uint8_t *end = NULL;
@@ -216,8 +234,8 @@ static int http_parse_headers(struct Socket *sk, const uint8_t *data, int data_l
  * */
 static inline int http_parse_chunk(struct Socket *sk, const uint8_t *data, int data_len)
 {
-    HTTP *http = (HTTP *)sk->l5_protocol;
-    TCP *tcp = (TCP *)sk->l4_protocol;
+    HTTP *http = &sk->http;
+    TCP *tcp = &sk->tcp;
 
     uint8_t c = 0;
     int len = 0;
@@ -381,8 +399,8 @@ retry:
 
 static inline int http_parse_body(struct Socket *sk, const uint8_t *data, int data_len)
 {
-    HTTP *http = (HTTP *)sk->l5_protocol;
-    TCP *tcp = (TCP *)sk->l4_protocol;
+    HTTP *http = &sk->http;
+    TCP *tcp = &sk->tcp;
 
     if (http->http_flags & HTTP_F_CONTENT_LENGTH)
     {
@@ -415,8 +433,8 @@ static inline int http_parse_body(struct Socket *sk, const uint8_t *data, int da
 
 int http_parse_run(struct Socket *sk, const uint8_t *data, int data_len)
 {
-    HTTP *http = (HTTP *)sk->l5_protocol;
-    TCP *tcp = (TCP *)sk->l4_protocol;
+    HTTP *http = &sk->http;
+    TCP *tcp = &sk->tcp;
 
     int len = 0;
 
@@ -553,4 +571,48 @@ void http_set_payload(int payload_size)
     {
         http_set_payload_client(http_req, MBUF_DATA_SIZE, payload_size);
     }
+}
+
+uint8_t http_client_process_data(struct Socket *sk,
+                                               uint8_t rx_flags, uint8_t *data, uint16_t data_len)
+{
+    HTTP *http = &sk->http;
+    TCP *tcp = &sk->tcp;
+    int ret = 0;
+    int8_t tx_flags = 0;
+
+    ret = http_parse_run(sk, data, data_len);
+    if (ret == HTTP_PARSE_OK)
+    {
+        if ((rx_flags & TH_FIN) == 0)
+        {
+            http_ack_delay_add(sk);
+            return 0;
+        }
+    }
+    else if (ret == HTTP_PARSE_END)
+    {
+        socket_init_http(http);
+        if (tcp->keepalive && ((rx_flags & TH_FIN) == 0))
+        {
+            http_ack_delay_add(sk);
+            tcp_start_keepalive_timer(sk, time_in_config());
+            return 0;
+        }
+        else
+        {
+            tx_flags |= TH_FIN;
+            http->http_ack = 0;
+        }
+    }
+    else
+    {
+        socket_init_http(http);
+        tcp->keepalive = 0;
+        http->http_length = 0;
+        tx_flags |= TH_FIN;
+        net_stats_http_error();
+    }
+
+    return TH_ACK | tx_flags;
 }

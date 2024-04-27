@@ -4,9 +4,10 @@
 #include "rte_mbuf.h"
 #include <functional>
 #include "common/define.h"
+#include <netinet/ether.h>
+#include <netinet/ip.h>
+#include "socket/socket.h"
 
-class Socket;
-class FiveTuples;
 
 enum ProtocolCode
 {
@@ -30,73 +31,46 @@ enum ProtocolCode
 typedef int (*parse_fivetuples_t)(rte_mbuf *, FiveTuples *, int);
 typedef int (*parse_socket_t)(rte_mbuf *, Socket *, int);
 
-struct PacketParser
-{
-    int parser_fivetuples_num;
-    int parser_socket_num;
-    parse_fivetuples_t parser_fivetuples[MAX_PROTOCOLS_PER_LAYER];
-    parse_socket_t parser_socket[MAX_PROTOCOLS_PER_LAYER];
-    int parse_packet(rte_mbuf *data, FiveTuples *ft, int offset);
-    int parse_packet(rte_mbuf *data, Socket *socket, int offset);
-    void add_parser(parse_fivetuples_t parse_func);
-    void add_parser(parse_socket_t parse_func);
-};
 
-class Protocol
+inline int parse_packet(rte_mbuf *data, FiveTuples *ft)
 {
-public:
-    virtual ProtocolCode name(){ return PTC_NONE; }
-    virtual int construct(Socket *socket, rte_mbuf *data) = 0;
-    virtual size_t get_hdr_len(Socket *socket, rte_mbuf *data) = 0;
-    virtual size_t hash() = 0;
-};
-
-class NamedProtocol : public Protocol
+    // __m128i tmpdata0 = _mm_loadu_si128(rte_pktmbuf_mtod_offset(data, __m128i *, sizeof(ether_header) + offsetof(iphdr, ttl)));
+    // _mm_storeu_si128((__m128i *) ft, tmpdata0);
+    // uint32_t src_addr = ft->src_addr;
+    // ft->src_addr = ft->dst_addr;
+    // ft->dst_addr = src_addr;
+    // uint16_t src_port = ft->src_port;
+    // ft->src_port = ft->dst_port;
+    // ft->dst_port = src_port;
+    ether_header *eth_hdr = rte_pktmbuf_mtod(data, struct ether_header *);
+    iphdr *ip_hdr = rte_pktmbuf_mtod_offset(data, struct iphdr *, sizeof(ether_header));
+    tcphdr *tcp_hdr = rte_pktmbuf_mtod_offset(data, struct tcphdr *, sizeof(ether_header)+sizeof(iphdr));
+    ft->src_addr = ntohl(ip_hdr->daddr);
+    ft->dst_addr = ntohl(ip_hdr->saddr);
+    ft->src_port = ntohs(tcp_hdr->dest);
+    ft->dst_port = ntohs(tcp_hdr->source);
+    ft->protocol = ip_hdr->protocol;
+    return 0;
+}
+inline int parse_packet(rte_mbuf *data, Socket *sk)
 {
-public:
-    ProtocolCode code_;
-    NamedProtocol(ProtocolCode code) : code_(code) {}
-    virtual ProtocolCode name() override { return code_; }
-    virtual int construct(Socket *socket, rte_mbuf *data) {return 0;};
-    virtual size_t get_hdr_len(Socket *socket, rte_mbuf *data) {return 0;};
-    virtual size_t hash() override {return std::hash<uint8_t>()(code_);};
-};
-
-class L2_Protocol : public Protocol
-{
-public:
-    L2_Protocol() = default;
-    static thread_local PacketParser parser;
-    virtual ProtocolCode name() override { return PTC_NONE; }
-    virtual int send_frame(Socket *socket, rte_mbuf *data) = 0;
-};
-
-class L3_Protocol : public Protocol
-{
-public:
-    L3_Protocol() = default;
-    static thread_local PacketParser parser;
-    virtual ProtocolCode name() override { return PTC_NONE; }
-};
-
-class L4_Protocol : public Protocol
-{
-public:
-    L4_Protocol() = default;
-    static thread_local PacketParser parser;
-    virtual ProtocolCode name() override { return PTC_NONE; }
-    virtual int process(Socket *socket, rte_mbuf *data) = 0;
-};
-
-class L5_Protocol : public Protocol
-{
-public:
-    L5_Protocol() = default;
-    static thread_local PacketParser parser;
-    virtual ProtocolCode name() override { return PTC_NONE; }
-};
-
-int parse_packet(rte_mbuf *data, FiveTuples *ft);
-int parse_packet(rte_mbuf *data, Socket *sk);
+    // __m128i tmpdata0 = _mm_loadu_si128(rte_pktmbuf_mtod_offset(data, __m128i *, sizeof(ether_header) + offsetof(iphdr, ttl)));
+    // _mm_storeu_si128((__m128i *) sk, tmpdata0);
+    // uint32_t src_addr = sk->src_addr;
+    // sk->src_addr = sk->dst_addr;
+    // sk->dst_addr = src_addr;
+    // uint16_t src_port = sk->src_port;
+    // sk->src_port = sk->dst_port;
+    // sk->dst_port = src_port;
+    ether_header *eth_hdr = rte_pktmbuf_mtod(data, struct ether_header *);
+    iphdr *ip_hdr = rte_pktmbuf_mtod_offset(data, struct iphdr *, sizeof(ether_header));
+    tcphdr *tcp_hdr = rte_pktmbuf_mtod_offset(data, struct tcphdr *, sizeof(ether_header)+sizeof(iphdr));
+    sk->src_addr = ntohl(ip_hdr->daddr);
+    sk->dst_addr = ntohl(ip_hdr->saddr);
+    sk->src_port = ntohs(tcp_hdr->dest);
+    sk->dst_port = ntohs(tcp_hdr->source);
+    sk->protocol = ip_hdr->protocol;
+    return 0;
+}
 
 #endif

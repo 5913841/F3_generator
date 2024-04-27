@@ -8,7 +8,7 @@
 #include "common/define.h"
 #include "dpdk/bond/bond.h"
 #include "netinet/in.h"
-#include "socket/socket.h"
+#include "common/addrtype.h"
 
 struct netif_port
 {
