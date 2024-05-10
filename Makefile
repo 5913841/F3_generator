@@ -1,5 +1,8 @@
 APP := THUGEN
-EXAMPLES := examples/http_flood/client_main.cpp examples/http_flood/server_main.cpp \
+# EXAMPLES := examples/http_flood/client_main.cpp examples/http_flood/server_main.cpp \
+# 			examples/http_flood/client_nothttp.cpp \
+
+EXAMPLES :=		examples/http_flood/server_nothttp.cpp \
             #   examples/http_flood/client_preset.cpp examples/http_flood/server_preset.cpp \
 			#   examples/http_flood/server_multithread.cpp examples/http_flood/client_multithread.cpp \
             #   examples/tcp_syn_flood/main.cpp \

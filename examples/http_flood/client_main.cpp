@@ -63,7 +63,6 @@ void config_tcp_variables()
     TCP::template_tcp_data = template_tcp_data;
     TCP::template_tcp_opt = template_tcp_opt;
     TCP::template_tcp_pkt = template_tcp_pkt;
-    TCP::global_duration_time = 60 * 1000;
     TCP::global_keepalive = false;
     TCP::global_stop = false;
     /* tsc */
@@ -131,7 +130,6 @@ int start_test(__rte_unused void *arg1)
 {
     ip4addr_t base_src = ip4addr_t("10.233.1.2");
     uint64_t begin_ts = current_ts_msec();
-    Socket *parser_socket = new Socket();
     while (true)
     {
         do
@@ -142,8 +140,8 @@ int start_test(__rte_unused void *arg1)
             {
                 break;
             }
-            parse_packet(m, parser_socket);
-            Socket *socket = TCP::socket_table->find_socket(parser_socket);
+            Socket* parse_socket = parse_packet(m);
+            Socket *socket = TCP::socket_table->find_socket(parse_socket);
             if (socket != nullptr)
                 socket->tcp.process(socket, m);
         } while (true);
@@ -175,7 +173,6 @@ int start_test(__rte_unused void *arg1)
             TIMERS.trigger();
         }
     }
-    delete parser_socket;
     return 0;
 }
 

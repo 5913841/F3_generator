@@ -22,7 +22,8 @@ struct mbuf_data
     uint16_t total_len;
 };
 
-typedef int(*constructor)(Socket*, rte_mbuf*);
+// typedef int(*constructor)(Socket*, rte_mbuf*);
+typedef std::function<int(Socket*, rte_mbuf*)> constructor;
 
 struct mbuf_cache
 {

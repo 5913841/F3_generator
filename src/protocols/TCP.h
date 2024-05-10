@@ -26,6 +26,34 @@ struct tcp_opt_mss
     uint16_t mss;
 } __attribute__((__packed__));
 
+struct global_tcp_vars
+{
+    bool flood;
+    bool server;
+    uint8_t send_window;
+    mbuf_cache *template_tcp_data;
+    mbuf_cache *template_tcp_opt;
+    mbuf_cache *template_tcp_pkt;
+    bool global_keepalive;
+    bool global_stop;
+    /* tsc */
+    uint64_t keepalive_request_interval;
+    int setted_keepalive_request_num;
+    // static std::function<void(Socket *sk)> release_socket_callback;
+    // static std::function<void(Socket *sk)> create_socket_callback;
+    // static std::function<bool(FiveTuples ft, Socket *sk)> checkvalid_socket_callback;
+    // static __thread void(*release_socket_callback)(Socket *sk);
+    // static __thread void(*create_socket_callback)(Socket *sk);
+    // static __thread bool(*checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
+    bool global_tcp_rst;
+    uint8_t tos;
+    bool use_http;
+    uint16_t global_mss;
+    bool constructing_opt_tmeplate;
+    SocketPointerTable* socket_table;
+    bool preset;
+};
+
 class TCP
 {
 public:
@@ -46,30 +74,8 @@ public:
     uint8_t retrans : 3;
     uint8_t keepalive : 1;
     uint8_t flags; /* tcp flags*/
-
-    static __thread bool flood;
-    static __thread bool server;
-    static __thread uint8_t send_window;
-    static __thread mbuf_cache *template_tcp_data;
-    static __thread mbuf_cache *template_tcp_opt;
-    static __thread mbuf_cache *template_tcp_pkt;
-    static __thread int global_duration_time;
-    static __thread bool global_keepalive;
-    static __thread bool global_stop;
-    /* tsc */
-    static __thread uint64_t keepalive_request_interval;
-    static __thread int setted_keepalive_request_num;
-    // static std::function<void(Socket *sk)> release_socket_callback;
-    // static std::function<void(Socket *sk)> create_socket_callback;
-    // static std::function<bool(FiveTuples ft, Socket *sk)> checkvalid_socket_callback;
-    // static __thread void(*release_socket_callback)(Socket *sk);
-    // static __thread void(*create_socket_callback)(Socket *sk);
-    // static __thread bool(*checkvalid_socket_callback)(FiveTuples ft, Socket *sk);
-    static __thread bool global_tcp_rst;
-    static __thread uint8_t tos;
-    static __thread bool use_http;
-    static __thread uint16_t global_mss;
-    static __thread bool constructing_opt_tmeplate;
+    static int pattern_num;
+    static __thread global_tcp_vars g_vars[MAX_PATTERNS];
     static thread_local SocketPointerTable* socket_table;
 
     static tcphdr *decode_hdr_pre(rte_mbuf *data)
@@ -86,16 +92,16 @@ public:
 
     int process(Socket *socket, rte_mbuf *data);
 
-    static void timer_init();
+    static void timer_init(int pattern);
 
-    static void tcp_init()
+    static void tcp_init(int pattern)
     {
         srand_(rte_rdtsc());
-        timer_init();
+        timer_init(pattern);
     }
 };
 
-struct rte_mbuf *tcp_reply(struct Socket *sk, uint8_t tcp_flags);
+void tcp_reply(struct Socket *sk, uint8_t tcp_flags);
 void tcp_start_keepalive_timer(struct Socket *sk, uint64_t now_tsc);
 
 Socket *tcp_new_socket(const Socket *template_socket);

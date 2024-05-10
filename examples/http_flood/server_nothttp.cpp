@@ -6,9 +6,6 @@
 // #define RTE_PKTMBUF_HEADROOM 256
 #define MBUF_SIZE (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 
-
-ip4addr_t target_ip("10.233.1.1");
-
 dpdk_config_user usrconfig = {
     .lcores = {0},
     .ports = {"0000:01:00.0"},
@@ -24,9 +21,9 @@ dpdk_config config = dpdk_config(&usrconfig);
 protocol_config p_config = {
     .protocol = "TCP",
     .mode = "server",
-    .use_http = true,
+    .use_http = false,
     .use_keepalive = false,
-    .cps = "1M",
+    .cps = "1.2M",
 };
 
 int start_test(__rte_unused void *arg1)
@@ -35,6 +32,7 @@ int start_test(__rte_unused void *arg1)
     uint64_t begin_ts = current_ts_msec();
     while (true)
     {
+        dpdk_config_percore::enter_epoch();
         rte_mbuf *m = nullptr;
 
         m = dpdk_config_percore::cfg_recv_packet();
@@ -46,22 +44,20 @@ int start_test(__rte_unused void *arg1)
             if(socket == nullptr)
             {
                 socket = tcp_new_socket(template_socket);
+                socket->pattern = 0;
                 memcpy(socket, parse_socket, sizeof(FiveTuples));
             }
             socket->tcp.process(socket, m);
         }
 
         dpdk_config_percore::cfg_send_flush();
-        http_ack_delay_flush();
+        // http_ack_delay_flush();
 
         // if (current_ts_msec() - begin_ts > 10 * 1000)
         // {
         //     break;
         // }
-        if (dpdk_config_percore::check_epoch_timer(0, false))
-        {
-            TIMERS.trigger();
-        }
+        TIMERS.trigger();
     }
     return 0;
 }

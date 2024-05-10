@@ -9,7 +9,7 @@ struct UniqueTimer {
     struct UniqueTimer *next;
     struct UniqueTimer *prev;
     uint64_t timer_tsc;
-    void* data;
+    // void* data;
 };
 
 struct UniqueTimerQueue {

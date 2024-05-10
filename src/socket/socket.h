@@ -21,13 +21,13 @@ class Socket;
 
 struct FiveTuples
 {
+    uint8_t pad0;
     uint8_t protocol;
     uint16_t pad1;
-    ip4addr_t src_addr;
     ip4addr_t dst_addr;
-	port_t src_port;	/* source port */
+    ip4addr_t src_addr;
 	port_t dst_port;	/* destination port */
-    uint8_t pad2;
+	port_t src_port;	/* source port */
     bool operator==(const FiveTuples &other) const;
     bool operator<(const FiveTuples &other) const;
     FiveTuples() { memset(this, 0, sizeof(FiveTuples)); }
@@ -47,15 +47,16 @@ struct FiveTuplesHash
 struct Socket
 {
 public:
+    uint8_t pad0;
     uint8_t protocol;
     uint16_t pad1;
-    ip4addr_t src_addr;
     ip4addr_t dst_addr;
-    port_t src_port;
+    ip4addr_t src_addr;
     port_t dst_port;
-    uint8_t pad2;
+    port_t src_port;
     TCP tcp;
     HTTP http;
+    uint8_t pattern;
     Socket()
     {
         src_addr = 0;

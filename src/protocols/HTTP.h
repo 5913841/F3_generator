@@ -9,6 +9,19 @@ class HTTP;
 
 extern thread_local HTTP *parser_http;
 
+struct global_http_vars
+{
+    int payload_size;
+    bool payload_random;
+    char http_host[HTTP_HOST_MAX];
+    char http_path[HTTP_PATH_MAX];
+    struct delay_vec
+    {
+        int next;
+        struct Socket *sockets[HTTP_ACK_DELAY_MAX];
+    } ack_delay;
+};
+
 enum HTTP_STATE
 {
     HTTP_IDLE,
@@ -48,15 +61,9 @@ public:
     uint8_t snd_window;
     uint32_t snd_max;
     HTTP_STATE state;
-    static __thread int payload_size;
-    static __thread bool payload_random;
-    static __thread char http_host[HTTP_HOST_MAX];
-    static __thread char http_path[HTTP_PATH_MAX];
-    static __thread struct delay_vec
-    {
-        int next;
-        struct Socket *sockets[HTTP_ACK_DELAY_MAX];
-    } ack_delay;
+    static int pattern_num;
+    static __thread global_http_vars g_vars[MAX_PATTERNS];
+    
     // #endif
     inline int construct(Socket *socket, rte_mbuf *data)
     {
@@ -93,9 +100,9 @@ static inline void http_parse_request(const uint8_t *data, uint16_t len)
 }
 
 #define HTTP_DATA_MIN_SIZE 70
-void http_set_payload(int payload_size);
-const char *http_get_request(void);
-const char *http_get_response(void);
+void http_set_payload(int payload_size, int pattern);
+const char *http_get_request(int pattern);
+const char *http_get_response(int pattern);
 
 // #ifdef HTTP_PARSE
 int http_ack_delay_flush();
@@ -111,13 +118,13 @@ static inline void socket_init_http(struct HTTP *http)
     http->http_ack = 0;
 }
 
-static inline void socket_init_http_server(struct HTTP *http, TCP *tcp)
+static inline void socket_init_http_server(struct HTTP *http, TCP *tcp, int pattern)
 {
     http->http_length = 0;
     http->http_parse_state = 0;
     http->http_flags = 0;
     http->http_ack = 0;
-    http->snd_max = tcp->snd_nxt + (uint32_t)http->payload_size;
+    http->snd_max = tcp->snd_nxt + (uint32_t)HTTP::g_vars[pattern].payload_size;
 }
 
 // #else

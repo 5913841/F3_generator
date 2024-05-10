@@ -21,26 +21,23 @@
     "\r\n"                      \
     "%s"
 
-static char http_rsp[MBUF_DATA_SIZE];
-static char http_req[MBUF_DATA_SIZE];
+static char http_rsp[MAX_PATTERNS][MBUF_DATA_SIZE];
+static char http_req[MAX_PATTERNS][MBUF_DATA_SIZE];
 static const char *http_rsp_body_default = "hello THUGEN!\r\n";
 
 thread_local HTTP *parser_http = new HTTP();
 
-__thread int HTTP::payload_size;
-__thread bool HTTP::payload_random;
-__thread char HTTP::http_host[HTTP_HOST_MAX];
-__thread char HTTP::http_path[HTTP_PATH_MAX];
-__thread struct HTTP::delay_vec HTTP::ack_delay;
+int HTTP::pattern_num;
+__thread global_http_vars HTTP::g_vars[MAX_PATTERNS];
 
-const char *http_get_request(void)
+const char *http_get_request(int pattern = 0)
 {
-    return http_req;
+    return http_req[pattern];
 }
 
-const char *http_get_response(void)
+const char *http_get_response(int pattern = 0)
 {
-    return http_rsp;
+    return http_rsp[pattern];
 }
 static inline int http_header_match(const uint8_t *start, int name_len, int name_size,
                                     uint8_t f0, uint8_t f1, uint8_t l0, uint8_t l1)
@@ -70,13 +67,13 @@ void http_ack_delay_add(struct Socket *sk)
         return;
     }
 
-    if (HTTP::ack_delay.next >= HTTP_ACK_DELAY_MAX)
+    if (HTTP::g_vars[sk->pattern].ack_delay.next >= HTTP_ACK_DELAY_MAX)
     {
         http_ack_delay_flush();
     }
 
-    HTTP::ack_delay.sockets[HTTP::ack_delay.next] = sk;
-    HTTP::ack_delay.next++;
+    HTTP::g_vars[sk->pattern].ack_delay.sockets[HTTP::g_vars[sk->pattern].ack_delay.next] = sk;
+    HTTP::g_vars[sk->pattern].ack_delay.next++;
     http->http_ack = 1;
 }
 
@@ -85,9 +82,9 @@ int http_ack_delay_flush()
     int i = 0;
     struct Socket *sk = NULL;
 
-    for (i = 0; i < HTTP::ack_delay.next; i++)
+    for (i = 0; i < HTTP::g_vars[sk->pattern].ack_delay.next; i++)
     {
-        sk = HTTP::ack_delay.sockets[i];
+        sk = HTTP::g_vars[sk->pattern].ack_delay.sockets[i];
         HTTP *http = &sk->http;
         TCP *tcp = &sk->tcp;
         if (http->http_ack)
@@ -100,9 +97,9 @@ int http_ack_delay_flush()
         }
     }
 
-    if (HTTP::ack_delay.next > 0)
+    if (HTTP::g_vars[sk->pattern].ack_delay.next > 0)
     {
-        HTTP::ack_delay.next = 0;
+        HTTP::g_vars[sk->pattern].ack_delay.next = 0;
     }
 
     return 0;
@@ -466,7 +463,7 @@ int http_parse_run(struct Socket *sk, const uint8_t *data, int data_len)
     }
 }
 
-void http_set_payload(char *data, int len, int new_line)
+void http_set_payload(char *data, int len, int new_line, int pattern)
 {
     int i = 0;
     int num = 'z' - 'a' + 1;
@@ -478,7 +475,7 @@ void http_set_payload(char *data, int len, int new_line)
         return;
     }
 
-    if (!HTTP::payload_random)
+    if (!HTTP::g_vars[pattern].payload_random)
     {
         memset(data, 'a', len);
     }
@@ -500,32 +497,32 @@ void http_set_payload(char *data, int len, int new_line)
     data[len] = 0;
 }
 
-static void http_set_payload_client(char *dest, int len, int payload_size)
+static void http_set_payload_client(char *dest, int len, int payload_size, int pattern)
 {
     int pad = 0;
     char buf[MBUF_DATA_SIZE] = {0};
 
     if (payload_size <= 0)
     {
-        snprintf(dest, len, HTTP_REQ_FORMAT, HTTP::http_path, HTTP::http_host);
+        snprintf(dest, len, HTTP_REQ_FORMAT, HTTP::g_vars[pattern].http_path, HTTP::g_vars[pattern].http_host);
     }
     else if (payload_size < HTTP_DATA_MIN_SIZE)
     {
-        http_set_payload(dest, payload_size, 1);
+        http_set_payload(dest, payload_size, 1, pattern);
     }
     else
     {
         pad = payload_size - HTTP_DATA_MIN_SIZE;
         if (pad > 0)
         {
-            http_set_payload(buf, pad, 0);
+            http_set_payload(buf, pad, 0, pattern);
         }
         buf[0] = '/';
-        snprintf(dest, len, HTTP_REQ_FORMAT, buf, HTTP::http_host);
+        snprintf(dest, len, HTTP_REQ_FORMAT, buf, HTTP::g_vars[pattern].http_host);
     }
 }
 
-static void http_set_payload_server(char *dest, int len, int payload_size)
+static void http_set_payload_server(char *dest, int len, int payload_size, int pattern)
 {
     int pad = 0;
     int content_length = 0;
@@ -539,13 +536,13 @@ static void http_set_payload_server(char *dest, int len, int payload_size)
     }
     else if (payload_size < HTTP_DATA_MIN_SIZE)
     {
-        http_set_payload(dest, payload_size, 1);
+        http_set_payload(dest, payload_size, 1, pattern);
     }
     else
     {
-        if (payload_size > TCP::global_mss)
+        if (payload_size > TCP::g_vars[pattern].global_mss)
         {
-            pad = TCP::global_mss - HTTP_DATA_MIN_SIZE;
+            pad = TCP::g_vars[pattern].global_mss - HTTP_DATA_MIN_SIZE;
         }
         else
         {
@@ -555,21 +552,21 @@ static void http_set_payload_server(char *dest, int len, int payload_size)
         content_length = payload_size - HTTP_DATA_MIN_SIZE;
         if (pad > 0)
         {
-            http_set_payload(buf, pad, 1);
+            http_set_payload(buf, pad, 1, pattern);
         }
         snprintf(dest, len, HTTP_RSP_FORMAT, content_length, buf);
     }
 }
 
-void http_set_payload(int payload_size)
+void http_set_payload(int payload_size, int pattern)
 {
-    if (TCP::server)
+    if (TCP::g_vars[pattern].server)
     {
-        http_set_payload_server(http_rsp, MBUF_DATA_SIZE, payload_size);
+        http_set_payload_server(http_rsp[pattern], MBUF_DATA_SIZE, HTTP::g_vars[pattern].payload_size, pattern);
     }
     else
     {
-        http_set_payload_client(http_req, MBUF_DATA_SIZE, payload_size);
+        http_set_payload_client(http_req[pattern], MBUF_DATA_SIZE, HTTP::g_vars[pattern].payload_size, pattern);
     }
 }
 

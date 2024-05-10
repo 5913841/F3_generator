@@ -9,6 +9,7 @@
 #include "common/packets.h"
 #include "timer/clock.h"
 #include "panel/panel.h"
+#include "common/rate_control.h"
 
 struct dpdk_config;
 struct dpdk_config_percore;
@@ -62,6 +63,7 @@ struct dpdk_config_percore
     tick_time time;
     cpuload cpusage;
     dpdk_config_percore(dpdk_config *config);
+    launch_control launch_ctls[MAX_PATTERNS];
 
     static inline void cfg_send_packet(struct rte_mbuf *mbuf)
     {
@@ -85,7 +87,7 @@ struct dpdk_config_percore
         tx_queue_flush(g_config_percore->tq, g_config_percore->port_id, g_config_percore->queue_id);
     }
 
-    static inline bool check_epoch_timer(uint64_t gap_tsc)
+    static void enter_epoch()
     {
         tick_time_update(&g_config_percore->time);
         CPULOAD_ADD_TSC(&g_config_percore->cpusage, time_in_config(), g_config_percore->epoch_work);
@@ -98,15 +100,19 @@ struct dpdk_config_percore
                 net_stats_print_speed(0, g_config_percore->time.second.count);
             }
         }
+    }
 
-        if (unlikely(time_in_config() - g_config_percore->epoch_last_tsc >= gap_tsc))
-        {
-            g_config_percore->epoch_work += 1;
-            g_config_percore->epoch_last_tsc = time_in_config();
-            return true;
-        }
+    static void time_update()
+    {
+        tick_time_update(&g_config_percore->time);
+    }
 
-        return false;
+    static inline int check_epoch_timer(int pattern, bool launch)
+    {
+        int launch_num = get_launch_num(g_config_percore->launch_ctls[pattern]);
+        if(launch) g_config_percore->epoch_work += launch_num;
+
+        return launch_num;
     }
 };
 

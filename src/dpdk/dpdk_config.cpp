@@ -119,6 +119,7 @@ dpdk_config_percore::dpdk_config_percore(dpdk_config *config)
     lcore_id = rte_lcore_id();
     port_id = lcore_id % config->num_ports;
     queue_id = lcore_id / config->num_ports;
+    port = &config->ports[port_id];
     tick_time_init(&time);
     cpuload_init(&cpusage);
     port = &config->ports[port_id];
@@ -128,7 +129,7 @@ dpdk_config_percore::dpdk_config_percore(dpdk_config *config)
     rq->rx_burst = config->rx_burst_size;
 }
 
-// bool dpdk_config_percore::check_epoch_timer(uint64_t gap_tsc)
+// int dpdk_config_percore::check_epoch_timer(int pattern)
 // {
 //     tick_time_update(&g_config_percore->time);
 //     CPULOAD_ADD_TSC(&g_config_percore->cpusage, time_in_config(), g_config_percore->epoch_work);
@@ -136,17 +137,16 @@ dpdk_config_percore::dpdk_config_percore(dpdk_config *config)
 //     if (unlikely(tsc_time_go(&g_config_percore->time.second, time_in_config())))
 //     {
 //         net_stats_timer_handler();
-//         net_stats_print_speed(0, g_config_percore->time.second.count);
+//         if(g_config_percore->lcore_id == 0)
+//         {
+//             net_stats_print_speed(0, g_config_percore->time.second.count);
+//         }
 //     }
 
-//     if (unlikely(time_in_config() - g_config_percore->epoch_last_tsc >= gap_tsc))
-//     {
-//         g_config_percore->epoch_work += 1;
-//         g_config_percore->epoch_last_tsc = time_in_config();
-//         return true;
-//     }
+//     int launch_num = get_launch_num(g_config_percore->launch_ctls[pattern]);
+//     g_config_percore->epoch_work += launch_num;
 
-//     return false;
+//     return launch_num;
 // }
 
 uint64_t &time_in_config()

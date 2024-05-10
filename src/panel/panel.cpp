@@ -174,15 +174,9 @@ static int net_stats_print_socket(struct net_stats *stats, char *buf, int buf_le
     net_stats_format_print_err(stats->socket_error, error, STATS_BUF_LEN);
     net_stats_format_print(stats->socket_current, curr, STATS_BUF_LEN);
 
-    if ((TCP::server) || (TCP::global_keepalive))
-    {
-        SNPRINTF(p, len, "skOpen  %s skClose  %s skCon    %s skErr   %s\n", open, close, curr, error);
-    }
-    else
-    {
-        net_stats_print_rtt(stats, rtt, STATS_BUF_LEN);
-        SNPRINTF(p, len, "skOpen  %s skClose  %s skCon    %s skErr   %s rtt(us) %s\n", open, close, curr, error, rtt);
-    }
+
+    net_stats_print_rtt(stats, rtt, STATS_BUF_LEN);
+    SNPRINTF(p, len, "skOpen  %s skClose  %s skCon    %s skErr   %s rtt(us) %s\n", open, close, curr, error, rtt);
     return p - buf;
 
 err:
