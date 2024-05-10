@@ -31,6 +31,7 @@ protocol_config p_config = {
 
 int start_test(__rte_unused void *arg1)
 {
+    dpdk_config_percore::enter_epoch();
     ip4addr_t base_src = ip4addr_t("10.233.1.2");
     uint64_t begin_ts = current_ts_msec();
     while (true)
@@ -58,10 +59,7 @@ int start_test(__rte_unused void *arg1)
         // {
         //     break;
         // }
-        if (dpdk_config_percore::check_epoch_timer(0, false))
-        {
-            TIMERS.trigger();
-        }
+        TIMERS.trigger();
     }
     return 0;
 }

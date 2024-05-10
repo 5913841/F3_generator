@@ -107,10 +107,10 @@ struct dpdk_config_percore
         tick_time_update(&g_config_percore->time);
     }
 
-    static inline int check_epoch_timer(int pattern, bool launch)
+    static inline int check_epoch_timer(int pattern)
     {
         int launch_num = get_launch_num(g_config_percore->launch_ctls[pattern]);
-        if(launch) g_config_percore->epoch_work += launch_num;
+        g_config_percore->epoch_work += launch_num;
 
         return launch_num;
     }
