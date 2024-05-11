@@ -68,13 +68,16 @@ static char *config_str_find_nondigit(char *s, bool float_enable)
     return NULL;
 }
 
-static int config_parse_number(char *str, bool float_enable, bool rate_enable)
+static int config_parse_number(const char *str, bool float_enable, bool rate_enable)
 {
     char *p = NULL;
     int rate = 1;
     int val = 0;
 
-    p = config_str_find_nondigit(str, float_enable);
+
+    char str_[1000];
+    memcpy(str_, str, strlen(str));
+    p = config_str_find_nondigit(str_, float_enable);
     if (p != NULL) {
         if (rate_enable == false) {
             return -1;
@@ -110,12 +113,14 @@ static int config_parse_number(char *str, bool float_enable, bool rate_enable)
     return val;
 }
 
-static uint64_t config_parse_time(char *str)
+static uint64_t config_parse_time(const char *str)
 {
     char *p = NULL;
     uint64_t val = 0;
 
-    p = config_str_find_nondigit(str, false);
+    char str_[1000];
+    memcpy(str_, str, strlen(str));
+    p = config_str_find_nondigit(str_, false);
     if (p == NULL) {
         return -1;
     }

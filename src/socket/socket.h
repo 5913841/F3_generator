@@ -66,6 +66,7 @@ public:
     };
     Socket(const Socket &other) : src_addr(other.src_addr), dst_addr(other.dst_addr), src_port(other.src_port), dst_port(other.dst_port), protocol(other.protocol)
     {
+        pattern = other.pattern;
         tcp = other.tcp;
         http = other.http;
     }
