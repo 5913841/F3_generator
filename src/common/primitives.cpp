@@ -1,31 +1,38 @@
 #include "common/primitives.h"
+#include <vector>
 
-using namespace primitives;
-
-dpdk_config primitives::dpdk_config_pri;
+dpdk_config * primitives::dpdk_config_pri;
 
 std::vector<protocol_config> primitives::p_configs;
 
 std::vector<Socket> primitives::sockets_ready_to_add;
 
-thread_local Socket primitives::socket_partby_pattern[MAX_PATTERNS][MAX_SOCKETS_RANGE_PER_PATTERN];
+thread_local Socket* primitives::socket_partby_pattern = new Socket[MAX_PATTERNS * MAX_SOCKETS_RANGE_PER_PATTERN];
 
 thread_local int primitives::socketsize_partby_pattern[MAX_PATTERNS];
 
 thread_local int primitives::socketpointer_partby_pattern[MAX_PATTERNS];
 
-random_socket_t primitives::random_methods[MAX_PATTERNS];
+primitives::random_socket_t primitives::random_methods[MAX_PATTERNS];
 
-static int thread_main(void* arg)
+int get_index(int pattern, int index)
+{
+    return (pattern * MAX_SOCKETS_RANGE_PER_PATTERN + index);
+}
+
+int thread_main(void* arg)
 {
     for(int i = 0; i < TCP::pattern_num ; i++)
     {
-        config_protocols(i, &p_configs[i]);
+        config_protocols(i, &primitives::p_configs[i]);
     }
-    delete &p_configs;
-    for(int i = 0; i < sockets_ready_to_add.size(); i++)
+    for(int i = primitives::sockets_ready_to_add.size()-1; i >= 0; i--)
     {
-        Socket socket = sockets_ready_to_add[i];
+        Socket socket = primitives::sockets_ready_to_add[i];
+        if(!rss_check_socket(&socket))
+        {
+            continue;
+        }
         if(TCP::g_vars[socket.pattern].server)
         {
             Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
@@ -36,13 +43,15 @@ static int thread_main(void* arg)
         {
             Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
             memcpy(ths_socket, &socket, sizeof(FiveTuples));
-            socket_partby_pattern[socket.pattern][socketsize_partby_pattern[socket.pattern]] = *ths_socket;
-            socketsize_partby_pattern[socket.pattern]++;
+            primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
+            primitives::socketsize_partby_pattern[socket.pattern]++;
         }
+        primitives::sockets_ready_to_add.pop_back();
     }
-    delete &sockets_ready_to_add;
 
-    memset(socketpointer_partby_pattern, 0, sizeof(socketpointer_partby_pattern));
+    primitives::sockets_ready_to_add.resize(0);
+
+    memset(primitives::socketpointer_partby_pattern, 0, sizeof(primitives::socketpointer_partby_pattern));
 
     while (true)
     {
@@ -90,18 +99,19 @@ static int thread_main(void* arg)
                     {
                         dpdk_config_percore::time_update();
 
-                        Socket *socket = &socket_partby_pattern[i][socketpointer_partby_pattern[i]];
-                        socketpointer_partby_pattern[i]++;
+repick:
+                        Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
+                        primitives::socketpointer_partby_pattern[i]++;
                         
-                        if (unlikely(socketpointer_partby_pattern[i] >= socketsize_partby_pattern[i]))
+                        if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
                         {
-                            socketpointer_partby_pattern[i] = 0;
+                            primitives::socketpointer_partby_pattern[i] = 0;
                         }
 
                         if (TCP::socket_table->insert_socket(socket) == -1)
                         {
                             tcp_release_socket(socket);
-                            continue;
+                            goto repick;
                         }
                         tcp_validate_csum(socket);
                         tcp_launch(socket);
@@ -113,12 +123,13 @@ static int thread_main(void* arg)
                     {
                         dpdk_config_percore::time_update();
                         Socket *socket = tcp_new_socket(&template_socket[i]);
-                        random_methods[i](socket);
+rerand:
+                        primitives::random_methods[i](socket);
 
-                        if (TCP::socket_table->insert_socket(socket) == -1)
+                        if (TCP::socket_table->insert_socket(socket) == -1 || !rss_check_socket(socket))
                         {
                             tcp_release_socket(socket);
-                            continue;
+                            goto rerand;
                         }
                         tcp_validate_csum(socket);
                         tcp_launch(socket);
@@ -132,8 +143,8 @@ static int thread_main(void* arg)
 
 void primitives::set_configs_and_init(dpdk_config_user& usrconfig, char** argv)
 {
-    dpdk_config_pri = dpdk_config(&usrconfig);
-    dpdk_init(&dpdk_config_pri, argv[0]);
+    dpdk_config_pri = new dpdk_config(&usrconfig);
+    dpdk_init(dpdk_config_pri, argv[0]);
 }
 
 void primitives::set_pattern_num(int pattern_num)

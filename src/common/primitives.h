@@ -1,19 +1,20 @@
 #ifndef PRIMITIVES_H
 #define PRIMITIVES_H
 
+#include "dpdk/divert/rss.h"
 #include "protocols/conf_protocol.h"
 
 namespace primitives {
 
 typedef void(*random_socket_t)(Socket* socket);
 
-extern dpdk_config dpdk_config_pri;
+extern dpdk_config * dpdk_config_pri;
 
 extern std::vector<protocol_config> p_configs;
 
 extern std::vector<Socket> sockets_ready_to_add;
 
-extern thread_local Socket socket_partby_pattern[MAX_PATTERNS][MAX_SOCKETS_RANGE_PER_PATTERN];
+extern thread_local Socket* socket_partby_pattern;
 
 extern thread_local int socketsize_partby_pattern[MAX_PATTERNS];
 

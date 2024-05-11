@@ -69,7 +69,7 @@ void http_ack_delay_add(struct Socket *sk)
 
     if (HTTP::g_vars[sk->pattern].ack_delay.next >= HTTP_ACK_DELAY_MAX)
     {
-        http_ack_delay_flush();
+        http_ack_delay_flush(sk->pattern);
     }
 
     HTTP::g_vars[sk->pattern].ack_delay.sockets[HTTP::g_vars[sk->pattern].ack_delay.next] = sk;
