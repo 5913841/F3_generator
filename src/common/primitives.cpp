@@ -98,7 +98,6 @@ int thread_main(void* arg)
                     for (int j = 0; j < launch_num; j++)
                     {
                         dpdk_config_percore::time_update();
-
 repick:
                         Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
                         primitives::socketpointer_partby_pattern[i]++;
@@ -110,7 +109,6 @@ repick:
 
                         if (TCP::socket_table->insert_socket(socket) == -1)
                         {
-                            tcp_release_socket(socket);
                             goto repick;
                         }
                         tcp_validate_csum(socket);
@@ -128,7 +126,6 @@ rerand:
 
                         if (TCP::socket_table->insert_socket(socket) == -1 || !rss_check_socket(socket))
                         {
-                            tcp_release_socket(socket);
                             goto rerand;
                         }
                         tcp_validate_csum(socket);

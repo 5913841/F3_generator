@@ -33,8 +33,6 @@ protocol_config p_config = {
 
 void random(Socket* socket)
 {
-    Socket *socket = tcp_new_socket(template_socket);
-
     socket->dst_port = rand_() % 20 + 1;
     socket->src_port = rand_();
     socket->src_addr = socket->src_addr + rand_() % 11;

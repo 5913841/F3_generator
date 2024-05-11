@@ -220,7 +220,10 @@ static inline void tcp_send_packet(rte_mbuf *m, struct Socket *sk)
 static inline void tcp_unvalid_close(struct Socket *sk)
 {
     if(TCP::g_vars[sk->pattern].preset){
-        return;
+        if(TCP::g_vars[sk->pattern].server)
+            return;
+        else
+            TCP::socket_table->remove_socket(sk);
     }
     else
     {
@@ -1271,7 +1274,13 @@ Socket *tcp_new_socket(const Socket *template_socket)
 
 void tcp_release_socket(Socket *socket)
 {
-    delete socket;
+    if(TCP::g_vars[socket->pattern].preset)
+    {
+        socket->tcp.state = TCP_CLOSE;
+    }
+    else{
+        delete socket;
+    }
 }
 
 void tcp_validate_socket(Socket *socket)
