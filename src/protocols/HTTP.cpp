@@ -77,14 +77,14 @@ void http_ack_delay_add(struct Socket *sk)
     http->http_ack = 1;
 }
 
-int http_ack_delay_flush()
+int http_ack_delay_flush(int pattern)
 {
     int i = 0;
     struct Socket *sk = NULL;
 
-    for (i = 0; i < HTTP::g_vars[sk->pattern].ack_delay.next; i++)
+    for (i = 0; i < HTTP::g_vars[pattern].ack_delay.next; i++)
     {
-        sk = HTTP::g_vars[sk->pattern].ack_delay.sockets[i];
+        sk = HTTP::g_vars[pattern].ack_delay.sockets[i];
         HTTP *http = &sk->http;
         TCP *tcp = &sk->tcp;
         if (http->http_ack)
@@ -97,9 +97,9 @@ int http_ack_delay_flush()
         }
     }
 
-    if (HTTP::g_vars[sk->pattern].ack_delay.next > 0)
+    if (HTTP::g_vars[pattern].ack_delay.next > 0)
     {
-        HTTP::g_vars[sk->pattern].ack_delay.next = 0;
+        HTTP::g_vars[pattern].ack_delay.next = 0;
     }
 
     return 0;

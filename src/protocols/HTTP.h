@@ -105,7 +105,7 @@ const char *http_get_request(int pattern);
 const char *http_get_response(int pattern);
 
 // #ifdef HTTP_PARSE
-int http_ack_delay_flush();
+int http_ack_delay_flush(int pattern);
 
 void http_ack_delay_add(struct Socket *sk);
 

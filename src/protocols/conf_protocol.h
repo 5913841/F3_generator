@@ -25,7 +25,7 @@ thread_local char const* data[MAX_PATTERNS];
 
 struct protocol_config {
     std::string protocol = "TCP";
-    std::string mode;
+    std::string mode = "client";
     bool preset = false;
     bool use_http = false;
     bool use_keepalive = false;
