@@ -37,12 +37,14 @@ int thread_main(void* arg)
         {
             Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
             memcpy(ths_socket, &socket, sizeof(FiveTuples));
+            tcp_validate_csum(ths_socket);
             TCP::socket_table->insert_socket(ths_socket);
         }
         else
         {
             Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
             memcpy(ths_socket, &socket, sizeof(FiveTuples));
+            tcp_validate_csum(ths_socket);
             primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
             primitives::socketsize_partby_pattern[socket.pattern]++;
         }
@@ -111,7 +113,6 @@ repick:
                         {
                             goto repick;
                         }
-                        tcp_validate_csum(socket);
                         tcp_launch(socket);
                     }
                 }

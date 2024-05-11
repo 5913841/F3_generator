@@ -250,12 +250,15 @@ static inline void tcp_socket_close(struct Socket *sk)
 
 static inline void tcp_socket_create(struct Socket *sk)
 {
-    if (!TCP::g_vars[sk->pattern].preset)
+    if(!sk->tcp.g_vars[sk->pattern].preset)
     {
-        TCP::socket_table->insert_socket(sk);
+        if (!TCP::g_vars[sk->pattern].preset)
+        {
+            TCP::socket_table->insert_socket(sk);
+        }
+        tcp_validate_csum(sk);
     }
     tcp_validate_socket(sk);
-    tcp_validate_csum(sk);
 }
 
 static inline void tcp_process_rst(struct Socket *sk, struct rte_mbuf *m)
