@@ -41,7 +41,10 @@ struct protocol_config {
     std::string cps = "1m";
     std::string tos = "0";
     std::string cc = "0";
-
+    std::string template_ip_src = "192.168.1.1";
+    std::string template_ip_dst = "192.168.1.2";
+    std::string template_port_src = "80";
+    std::string template_port_dst = "80";
 };
 
 

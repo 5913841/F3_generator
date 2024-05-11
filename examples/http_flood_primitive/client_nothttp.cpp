@@ -25,9 +25,20 @@ protocol_config p_config = {
     .use_http = false,
     .use_keepalive = false,
     .cps = "1.2M",
+    .template_ip_src = "10.233.1.2",
+    .template_ip_dst = "10.233.1.3"
 };
 
 
+
+void random(Socket* socket)
+{
+    Socket *socket = tcp_new_socket(template_socket);
+
+    socket->dst_port = rand_() % 20 + 1;
+    socket->src_port = rand_();
+    socket->src_addr = socket->src_addr + rand_() % 11;
+}
 
 int main(int argc, char **argv)
 {
@@ -36,6 +47,8 @@ int main(int argc, char **argv)
     set_pattern_num(1);
 
     add_pattern(p_config);
+
+    set_random_method(random, 0);
 
     run_setted();
 }

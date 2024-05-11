@@ -169,6 +169,10 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
 
         template_socket->protocol = IPPROTO_TCP;
         template_socket->pattern = pattern;
+        template_socket->src_addr = ip4addr_t(protocol_cfg->template_ip_src);
+        template_socket->dst_addr = ip4addr_t(protocol_cfg->template_ip_dst);
+        template_socket->src_port = atoi(protocol_cfg->template_port_src.data());
+        template_socket->dst_port = atoi(protocol_cfg->template_port_dst.data());
 
         launch_control_init(&g_config_percore->launch_ctls[pattern], cps, cc, atoi(protocol_cfg->launch_batch.data()));
         constructor constructors[4];
