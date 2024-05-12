@@ -1,5 +1,6 @@
 APP := THUGEN
-EXAMPLES := examples/http_flood_primitive/client_mix.cpp examples/http_flood_primitive/server_mix.cpp \
+EXAMPLES := examples/http_flood_primitive/client_multithread.cpp examples/http_flood_primitive/server_multithread.cpp \
+			# examples/http_flood_primitive/client_mix.cpp examples/http_flood_primitive/server_mix.cpp \
 			# examples/http_flood_primitive/server_nothttp.cpp examples/http_flood_primitive/client_nothttp.cpp \
 			# examples/http_flood_primitive/server_preset.cpp examples/http_flood_primitive/client_preset.cpp \
 			# examples/http_flood/client_main.cpp examples/http_flood/server_main.cpp \
