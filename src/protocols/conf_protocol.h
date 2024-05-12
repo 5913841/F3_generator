@@ -34,6 +34,7 @@ struct protocol_config {
     std::string keepalive_request_maxnum = "0";
     bool just_send_first_packet = false;
     std::string launch_batch = "4";
+    std::string global_mss = "1460";
     bool payload_random = false;
     std::string payload_size = "80";
     std::string send_window = "0";

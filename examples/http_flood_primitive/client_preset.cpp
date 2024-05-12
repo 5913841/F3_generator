@@ -27,6 +27,7 @@ protocol_config p_config = {
     .use_keepalive = true,
     .keepalive_interval = "1s",
     .keepalive_request_maxnum = "10",
+    .payload_size = "100",
     .cps = "0.1M",
 };
 

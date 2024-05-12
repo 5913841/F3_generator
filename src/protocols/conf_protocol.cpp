@@ -147,12 +147,13 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
         TCP::g_vars[pattern].template_tcp_pkt = &template_tcp_pkt[pattern];
         TCP::g_vars[pattern].preset = protocol_cfg->preset;
         TCP::g_vars[pattern].use_http = protocol_cfg->use_http;
+        TCP::g_vars[pattern].global_mss = atoi(protocol_cfg->mss.data());
 
         TCP* template_tcp = &template_socket[pattern].tcp;
         data[pattern] = TCP::g_vars[pattern].server ? http_get_response(pattern) : http_get_request(pattern);
         template_tcp->retrans = 0;
         template_tcp->keepalive_request_num = 0;
-        template_tcp->keepalive = TCP::g_vars[0].global_keepalive;
+        template_tcp->keepalive = TCP::g_vars[pattern].global_keepalive;
         uint32_t seed = (uint32_t)rte_rdtsc();
         template_tcp->snd_nxt = rand_r(&seed);
         template_tcp->snd_una = template_tcp->snd_nxt;
@@ -160,10 +161,10 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
         template_tcp->state = TCP_CLOSE;
 
         HTTP::g_vars[pattern].payload_size = atoi(protocol_cfg->payload_size.data());
-        HTTP::g_vars[0].payload_random = protocol_cfg->payload_random;
+        HTTP::g_vars[pattern].payload_random = protocol_cfg->payload_random;
         strcpy(HTTP::g_vars[pattern].http_host, HTTP_HOST_DEFAULT);
         strcpy(HTTP::g_vars[pattern].http_path, HTTP_PATH_DEFAULT);
-        http_set_payload(HTTP::g_vars[0].payload_size, 0);
+        http_set_payload(HTTP::g_vars[pattern].payload_size, pattern);
         HTTP* template_http = &template_socket[pattern].http;
         template_http->http_length = 0;
         template_http->http_parse_state = 0;
