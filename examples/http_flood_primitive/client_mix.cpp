@@ -24,7 +24,7 @@ protocol_config p_config1 = {
     .mode = "client",
     .use_http = false,
     .use_keepalive = false,
-    .cps = "0.5M",
+    .cps = "0.23M",
     .template_ip_src = "10.223.1.2",
     .template_ip_dst = "10.223.1.3"
 };
@@ -34,10 +34,10 @@ protocol_config p_config2 = {
     .mode = "client",
     .use_http = true,
     .use_keepalive = true,
-    .keepalive_interval = "0.3s",
+    .keepalive_interval = "1s",
     .keepalive_request_maxnum = "2",
     .payload_size = "200",
-    .cps = "0.5M",
+    .cps = "0.23M",
     .template_ip_src = "10.233.1.2",
     .template_ip_dst = "10.233.1.3"
 };

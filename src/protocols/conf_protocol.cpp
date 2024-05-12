@@ -171,12 +171,12 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
         template_http->http_flags = 0;
         template_http->http_ack = 0;
 
-        template_socket->protocol = IPPROTO_TCP;
-        template_socket->pattern = pattern;
-        template_socket->src_addr = ip4addr_t(protocol_cfg->template_ip_src);
-        template_socket->dst_addr = ip4addr_t(protocol_cfg->template_ip_dst);
-        template_socket->src_port = atoi(protocol_cfg->template_port_src.data());
-        template_socket->dst_port = atoi(protocol_cfg->template_port_dst.data());
+        template_socket[pattern].protocol = IPPROTO_TCP;
+        template_socket[pattern].pattern = pattern;
+        template_socket[pattern].src_addr = ip4addr_t(protocol_cfg->template_ip_src);
+        template_socket[pattern].dst_addr = ip4addr_t(protocol_cfg->template_ip_dst);
+        template_socket[pattern].src_port = atoi(protocol_cfg->template_port_src.data());
+        template_socket[pattern].dst_port = atoi(protocol_cfg->template_port_dst.data());
 
         launch_control_init(&g_config_percore->launch_ctls[pattern], cps, cc, atoi(protocol_cfg->launch_batch.data()));
         constructor constructors[4];
@@ -185,12 +185,12 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
         constructors[2] = [template_tcp](Socket *sk, rte_mbuf *m){return template_tcp->construct(sk, m);};
         constructors[3] = [template_http](Socket *sk, rte_mbuf *m){return template_http->construct(sk, m);};
         template_tcp_data[pattern].mbuf_pool = mbuf_pool_create(g_config, (std::string("template_tcp_data") + "_" + std::to_string(g_config_percore->lcore_id) + "_" + (std::to_string(pattern))).c_str(), g_config_percore->port_id, g_config_percore->queue_id);
-        mbuf_template_pool_setby_constructors(template_tcp_data + pattern, template_socket, constructors, data[pattern], strlen(data[pattern]));
+        mbuf_template_pool_setby_constructors(template_tcp_data + pattern, template_socket + pattern, constructors, data[pattern], strlen(data[pattern]));
         template_tcp_pkt[pattern].mbuf_pool = mbuf_pool_create(g_config, (std::string("template_tcp_pkt") + "_" + std::to_string(g_config_percore->lcore_id) + "_" + (std::to_string(pattern))).c_str(), g_config_percore->port_id, g_config_percore->queue_id);
-        mbuf_template_pool_setby_constructors(template_tcp_pkt + pattern, template_socket, constructors, nullptr, 0);
+        mbuf_template_pool_setby_constructors(template_tcp_pkt + pattern, template_socket + pattern, constructors, nullptr, 0);
         TCP::g_vars[pattern].constructing_opt_tmeplate = true;
         template_tcp_opt[pattern].mbuf_pool = mbuf_pool_create(g_config, (std::string("template_tcp_opt") + "_" + std::to_string(g_config_percore->lcore_id) + "_" + (std::to_string(pattern))).c_str(), g_config_percore->port_id, g_config_percore->queue_id);
-        mbuf_template_pool_setby_constructors(template_tcp_opt + pattern, template_socket, constructors, nullptr, 0);
+        mbuf_template_pool_setby_constructors(template_tcp_opt + pattern, template_socket + pattern, constructors, nullptr, 0);
 
         TCP::tcp_init(pattern);
     }

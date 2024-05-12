@@ -23,7 +23,7 @@ protocol_config p_config1 = {
     .mode = "server",
     .use_http = false,
     .use_keepalive = false,
-    .cps = "0.5M",
+    .cps = "0.3M",
 };
 
 protocol_config p_config2 = {
@@ -31,10 +31,10 @@ protocol_config p_config2 = {
     .mode = "server",
     .use_http = true,
     .use_keepalive = true,
-    .keepalive_interval = "0.3s",
+    .keepalive_interval = "1s",
     .keepalive_request_maxnum = "2",
     .payload_size = "100",
-    .cps = "0.5M",
+    .cps = "0.3M",
 };
 
 int main(int argc, char **argv)
