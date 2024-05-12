@@ -87,6 +87,10 @@ int TCP::construct(Socket *socket, rte_mbuf *data)
         rte_pktmbuf_prepend(data, sizeof(struct tcp_opt_mss));
     }
     tcphdr *tcp = decode_hdr_pre(data);
+    if (g_vars[socket->pattern].constructing_opt_tmeplate && g_vars[socket->pattern].global_mss != 0)
+    {
+        tcp->res1 = socket->pattern;
+    }
     tcp->source = socket->src_port;
     tcp->dest = socket->dst_port;
     tcp->seq = snd_nxt;

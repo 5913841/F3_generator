@@ -15,6 +15,12 @@ thread_local int primitives::socketpointer_partby_pattern[MAX_PATTERNS];
 
 primitives::random_socket_t primitives::random_methods[MAX_PATTERNS];
 
+uint8_t get_packet_pattern(rte_mbuf *m)
+{
+    tcphdr* th = rte_pktmbuf_mtod_offset(m, tcphdr*, sizeof(ethhdr) + sizeof(iphdr));
+    return th->res1;
+}
+
 int get_index(int pattern, int index)
 {
     return (pattern * MAX_SOCKETS_RANGE_PER_PATTERN + index);
@@ -74,12 +80,13 @@ int thread_main(void* arg)
                 break;
             }
             recv_num++;
+            uint8_t pattern = get_packet_pattern(m);
             Socket* parse_socket = parse_packet(m);
             Socket *socket = TCP::socket_table->find_socket(parse_socket);
             if (socket == nullptr)
             {
-                socket = tcp_new_socket(template_socket);
-                socket->pattern = 0;
+                socket = tcp_new_socket(&template_socket[pattern]);
+                socket->pattern = pattern;
                 memcpy(socket, parse_socket, sizeof(FiveTuples));
             }
             socket->tcp.process(socket, m);
