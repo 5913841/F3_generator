@@ -22,6 +22,8 @@ int get_index(int pattern, int index)
 
 int thread_main(void* arg)
 {
+    memset(primitives::socketsize_partby_pattern, 0, sizeof(primitives::socketsize_partby_pattern));
+
     for(int i = 0; i < TCP::pattern_num ; i++)
     {
         config_protocols(i, &primitives::p_configs[i]);
@@ -37,6 +39,7 @@ int thread_main(void* arg)
         {
             Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
             memcpy(ths_socket, &socket, sizeof(FiveTuples));
+            ths_socket->protocol = IPPROTO_TCP;
             tcp_validate_csum(ths_socket);
             TCP::socket_table->insert_socket(ths_socket);
         }
@@ -44,9 +47,11 @@ int thread_main(void* arg)
         {
             Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
             memcpy(ths_socket, &socket, sizeof(FiveTuples));
+            ths_socket->protocol = IPPROTO_TCP;
             tcp_validate_csum(ths_socket);
             primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
             primitives::socketsize_partby_pattern[socket.pattern]++;
+            delete ths_socket;
         }
         primitives::sockets_ready_to_add.pop_back();
     }
@@ -94,6 +99,7 @@ int thread_main(void* arg)
             }
             else
             {
+                int fail_cnt = 0;
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
                 if(TCP::g_vars[i].preset)
                 {
@@ -111,6 +117,11 @@ repick:
 
                         if (TCP::socket_table->insert_socket(socket) == -1)
                         {
+                            if(unlikely(fail_cnt >= 5))
+                            {
+                                goto continue_epoch;
+                            }
+                            fail_cnt++;
                             goto repick;
                         }
                         tcp_launch(socket);
@@ -127,6 +138,11 @@ rerand:
 
                         if (TCP::socket_table->insert_socket(socket) == -1 || !rss_check_socket(socket))
                         {
+                            if(unlikely(fail_cnt >= 5))
+                            {
+                                goto continue_epoch;
+                            }
+                            fail_cnt++;
                             goto rerand;
                         }
                         tcp_validate_csum(socket);
@@ -135,8 +151,10 @@ rerand:
                 }
             }
         }
+continue_epoch:
         TIMERS.trigger();
     }
+    return 0;
 }
 
 void primitives::set_configs_and_init(dpdk_config_user& usrconfig, char** argv)

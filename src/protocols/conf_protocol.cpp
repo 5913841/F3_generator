@@ -40,6 +40,7 @@ int config_parse_number(const char *str, bool float_enable, bool rate_enable)
 
 
     char str_[1000];
+    memset(str_, 0, 1000);
     memcpy(str_, str, strlen(str));
     p = config_str_find_nondigit(str_, float_enable);
     if (p != NULL) {
@@ -83,6 +84,7 @@ uint64_t config_parse_time(const char *str)
     uint64_t val = 0;
 
     char str_[1000];
+    memset(str_, 0, 1000);
     memcpy(str_, str, strlen(str));
     p = config_str_find_nondigit(str_, false);
     if (p == NULL) {
@@ -137,13 +139,14 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
             printf("Invalid mode for TCP, using default mode (client)");
             TCP::g_vars[pattern].server = false;
         }
+        int cc = config_parse_number(protocol_cfg->cc.c_str(), true, true);
+        int cps = config_parse_number(protocol_cfg->cps.c_str(), true, true);
         TCP::g_vars[pattern].tos = atoi(protocol_cfg->tos.data());
-        int cc = config_parse_number(protocol_cfg->cc.data(), true, true);
-        int cps = config_parse_number(protocol_cfg->cps.data(), true, true);
         TCP::g_vars[pattern].template_tcp_data = &template_tcp_data[pattern];
         TCP::g_vars[pattern].template_tcp_opt = &template_tcp_opt[pattern];
         TCP::g_vars[pattern].template_tcp_pkt = &template_tcp_pkt[pattern];
         TCP::g_vars[pattern].preset = protocol_cfg->preset;
+        TCP::g_vars[pattern].use_http = protocol_cfg->use_http;
 
         TCP* template_tcp = &template_socket[pattern].tcp;
         data[pattern] = TCP::g_vars[pattern].server ? http_get_response(pattern) : http_get_request(pattern);

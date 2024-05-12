@@ -223,6 +223,7 @@ static inline void tcp_unvalid_close(struct Socket *sk)
         if(TCP::g_vars[sk->pattern].server)
             return;
         else
+            sk->tcp.state = TCP_CLOSE;
             TCP::socket_table->remove_socket(sk);
     }
     else
@@ -346,7 +347,7 @@ struct KeepAliveTimerQueue : public UniqueTimerQueue
     }
     void init_tsc(int pattern)
     {
-        delay_tsc = TCP::g_vars[pattern].keepalive_request_interval * (g_tsc_per_second / 1000);
+        delay_tsc = TCP::g_vars[pattern].keepalive_request_interval;
     }
     void callback(UniqueTimer *timer) override
     {
@@ -373,7 +374,7 @@ struct TimeoutTimerQueue : public UniqueTimerQueue
     }
     void init_tsc(int pattern)
     {
-        delay_tsc = ((RETRANSMIT_TIMEOUT * RETRANSMIT_NUM_MAX) + TCP::g_vars[pattern].keepalive_request_interval) * (g_tsc_per_second / 1000);
+        delay_tsc = (RETRANSMIT_TIMEOUT * RETRANSMIT_NUM_MAX) * (g_tsc_per_second / 1000) + TCP::g_vars[pattern].keepalive_request_interval;
     }
     void callback(UniqueTimer *timer) override
     {
@@ -1277,13 +1278,7 @@ Socket *tcp_new_socket(const Socket *template_socket)
 
 void tcp_release_socket(Socket *socket)
 {
-    if(TCP::g_vars[socket->pattern].preset)
-    {
-        socket->tcp.state = TCP_CLOSE;
-    }
-    else{
-        delete socket;
-    }
+    delete socket;
 }
 
 void tcp_validate_socket(Socket *socket)

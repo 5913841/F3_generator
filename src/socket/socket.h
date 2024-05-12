@@ -74,9 +74,9 @@ public:
     {
     }
 
-    Socket(const FiveTuples &five_tuples, int pattern)
+    Socket(const FiveTuples &five_tuples, int pattern_)
     {
-        pattern = pattern;
+        pattern = pattern_;
         protocol = five_tuples.protocol;
         src_addr = five_tuples.src_addr;
         dst_addr = five_tuples.dst_addr;

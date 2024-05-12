@@ -8,7 +8,6 @@ using namespace primitives;
 // #define RTE_PKTMBUF_HEADROOM 256
 #define MBUF_SIZE (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
 
-ip4addr_t target_ip("10.233.1.1");
 
 dpdk_config_user usrconfig = {
     .lcores = {0},
@@ -25,8 +24,10 @@ protocol_config p_config = {
     .mode = "client",
     .preset = true,
     .use_http = true,
-    .use_keepalive = false,
-    .cps = "1.2M",
+    .use_keepalive = true,
+    .keepalive_interval = "1s",
+    .keepalive_request_maxnum = "10",
+    .cps = "0.1M",
 };
 
 int main(int argc, char **argv)
@@ -40,7 +41,7 @@ int main(int argc, char **argv)
     ip4addr_t base_src = ip4addr_t("10.233.1.0");
     ip4addr_t base_dst = ip4addr_t("10.234.1.0");
     srand_(2024);
-    for(int i = 0; i < 10000000; i++)
+    for(int i = 0; i < 1000000; i++)
     {
         FiveTuples fivetuples;
         fivetuples.dst_port = rand_() % 20 + 1;
