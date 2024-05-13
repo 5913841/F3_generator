@@ -15,6 +15,9 @@ dpdk_config_user usrconfig = {
     .gateway_for_ports = {"90:e2:ba:87:62:98"},
     .queue_num_per_port = {2},
     .always_accurate_time = false,
+    .flow_distribution_strategy = "rss",
+    .rss_type = "l3",
+    .mq_rx_rss = true,
     .tx_burst_size = 8,
     .rx_burst_size = 2048,
 };

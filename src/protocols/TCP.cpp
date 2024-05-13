@@ -34,6 +34,8 @@
 // __thread uint16_t TCP::global_mss;
 // __thread bool TCP::constructing_opt_tmeplate;
 
+const int timer_offset = offsetof(TCP, timer) + offsetof(Socket, tcp);
+
 __thread global_tcp_vars TCP::g_vars[MAX_PATTERNS];
 int TCP::pattern_num;
 
@@ -356,7 +358,7 @@ struct KeepAliveTimerQueue : public UniqueTimerQueue
     void callback(UniqueTimer *timer) override
     {
         // tcp_do_keepalive((Socket *)timer->data);
-        tcp_do_keepalive((Socket *)((void*)timer - offsetof(Socket, tcp) - offsetof(TCP, timer)));
+        tcp_do_keepalive((Socket *)((void*)timer - timer_offset));
     }
 };
 
@@ -383,7 +385,7 @@ struct TimeoutTimerQueue : public UniqueTimerQueue
     void callback(UniqueTimer *timer) override
     {
         // tcp_do_timeout((Socket *)timer->data);
-        tcp_do_timeout((Socket *)((void*)timer - offsetof(Socket, tcp) - offsetof(TCP, timer)));
+        tcp_do_timeout((Socket *)((void*)timer - timer_offset));
     }
 };
 
@@ -470,7 +472,7 @@ struct RetransmitTimerQueue : public UniqueTimerQueue
     void callback(UniqueTimer *timer) override
     {
         // return tcp_do_retransmit((Socket *)timer->data);
-        return tcp_do_retransmit((Socket *)((void*)timer - offsetof(Socket, tcp) - offsetof(TCP, timer)));
+        return tcp_do_retransmit((Socket *)((void*)timer - timer_offset));
     }
 };
 

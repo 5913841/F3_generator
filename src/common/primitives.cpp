@@ -70,7 +70,7 @@ int thread_main(void* arg)
     {
         dpdk_config_percore::enter_epoch();
         int recv_num = 0;
-        
+        #pragma unroll
         do
         {
             rte_mbuf *m = dpdk_config_percore::cfg_recv_packet();
@@ -93,6 +93,8 @@ int thread_main(void* arg)
         } while (recv_num < 4);
 
         dpdk_config_percore::cfg_send_flush();
+        
+        #pragma unroll
         for (int i = 0; i < MAX_PATTERNS; i++)
         {
             if(i >= TCP::pattern_num)
@@ -143,7 +145,7 @@ repick:
 rerand:
                         primitives::random_methods[i](socket);
 
-                        if (TCP::socket_table->insert_socket(socket) == -1 || !rss_check_socket(socket))
+                        if (!rss_check_socket(socket) || TCP::socket_table->insert_socket(socket) == -1)
                         {
                             if(unlikely(fail_cnt >= 5))
                             {

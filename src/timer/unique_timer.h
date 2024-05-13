@@ -84,7 +84,18 @@ inline void unique_queue_trigger(struct UniqueTimerQueue *queue, uint64_t now_ts
 struct UniqueQueueGroup
 {
     struct UniqueTimerQueue* queues[MAX_UNIQUE_TIMER_SIZE];
-    uint32_t size = 0;
+    uint32_t size;
+
+    UniqueQueueGroup()
+    {
+        size = 0;
+        #pragma unroll
+        for(int i = 0; i < MAX_UNIQUE_TIMER_SIZE; i++)
+        {
+            queues[i] = NULL;
+        }
+    }
+
     void add_queue(struct UniqueTimerQueue* queue)
     {
         if (size < MAX_UNIQUE_TIMER_SIZE)
@@ -95,9 +106,12 @@ struct UniqueQueueGroup
     
     void trigger()
     {
-        for(int i = 0; i < size; i++)
+        uint64_t now_tsc = time_in_config();
+        #pragma unroll
+        for(int i = 0; i < MAX_UNIQUE_TIMER_SIZE; i++)
         {
-            unique_queue_trigger(queues[i], time_in_config());
+            if(!queues[i]) break;
+            unique_queue_trigger(queues[i], now_tsc);
         }
     }
 };
