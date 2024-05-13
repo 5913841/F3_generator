@@ -89,7 +89,7 @@ int TCP::construct(Socket *socket, rte_mbuf *data)
         rte_pktmbuf_prepend(data, sizeof(struct tcp_opt_mss));
     }
     tcphdr *tcp = decode_hdr_pre(data);
-    if (g_vars[socket->pattern].constructing_opt_tmeplate && g_vars[socket->pattern].global_mss != 0)
+    if (g_vars[socket->pattern].constructing_opt_tmeplate && g_vars[socket->pattern].global_mss != 0 && !g_vars[socket->pattern].server)
     {
         tcp->res1 = socket->pattern;
     }
