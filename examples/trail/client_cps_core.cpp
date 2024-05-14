@@ -62,6 +62,12 @@ int main(int argc, char **argv)
 {
     usrconfig.lcores = parseStringToIntVector(argv[1]);
     usrconfig.queue_num_per_port = {((int)usrconfig.lcores.size())};
+    if (usrconfig.lcores.size() > 1)
+    {
+        usrconfig.flow_distribution_strategy = "rss";
+        usrconfig.rss_type = "l3";
+        usrconfig.mq_rx_rss = true;
+    }
 
     p_config.cps = argv[2];
 

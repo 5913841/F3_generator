@@ -49,7 +49,13 @@ std::vector<int> parseStringToIntVector(const std::string& str) {
 int main(int argc, char **argv)
 {
     usrconfig.lcores = parseStringToIntVector(argv[1]);
-    usrconfig.queue_num_per_port = {(usrconfig.lcores.size())};
+    usrconfig.queue_num_per_port = {((int)usrconfig.lcores.size())};
+    if (usrconfig.lcores.size() > 1)
+    {
+        usrconfig.flow_distribution_strategy = "rss";
+        usrconfig.rss_type = "l3";
+        usrconfig.mq_rx_rss = true;
+    }
 
     set_configs_and_init(usrconfig, argv);
 
