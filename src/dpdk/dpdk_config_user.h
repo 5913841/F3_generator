@@ -26,6 +26,9 @@ struct dpdk_config_user
     bool mq_rx_none;
     int tx_burst_size;
     int rx_burst_size;
+#ifdef CLEAR_NIC
+    const bool use_clear_nic_queue = false;
+#endif
 };
 
 #endif /* _DPDK_CONFIG_USER_H_ */

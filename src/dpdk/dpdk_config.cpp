@@ -5,7 +5,10 @@
 __thread dpdk_config_percore *g_config_percore;
 dpdk_config *g_config;
 
-dpdk_config::dpdk_config(dpdk_config_user *user_config)
+dpdk_config::dpdk_config(dpdk_config_user *user_config) 
+#ifdef CLEAR_NIC
+    : use_clear_nic_queue(user_config->use_clear_nic_queue)
+#endif
 {
     num_lcores = user_config->lcores.size();
     memcpy(lcores, user_config->lcores.data(), num_lcores * sizeof(int));
@@ -127,6 +130,9 @@ dpdk_config_percore::dpdk_config_percore(dpdk_config *config)
     tq = new tx_queue();
     tq->tx_burst = config->tx_burst_size;
     rq->rx_burst = config->rx_burst_size;
+#ifdef CLEAR_NIC
+    clear_nic_queue_next = rte_rdtsc() + g_tsc_per_second * 10;
+#endif
 }
 
 // int dpdk_config_percore::check_epoch_timer(int pattern)

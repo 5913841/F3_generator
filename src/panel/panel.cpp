@@ -14,6 +14,7 @@
 static struct net_stats *g_net_stats_all[THREAD_NUM_MAX];
 static struct net_stats g_net_stats_total;
 __thread struct net_stats g_net_stats;
+rte_eth_stats g_eth_stats;
 
 #define NET_STATS_CLOUR_ON "\033[41;37m"
 #define NET_STATS_CLOUR_OFF "\033[0m"
@@ -512,7 +513,6 @@ err:
 
 static void net_stats_print_eth(FILE *fp)
 {
-    struct rte_eth_stats st;
     struct netif_port *port = NULL;
     char ierrors[STATS_BUF_LEN];
     char oerrors[STATS_BUF_LEN];
@@ -523,10 +523,10 @@ static void net_stats_print_eth(FILE *fp)
 
     config_for_each_port(g_config, port)
     {
-        rte_eth_stats_get(port->id, &st);
-        ierr += st.ierrors;
-        oerr += st.oerrors;
-        imis += st.imissed;
+        rte_eth_stats_get(port->id, &g_eth_stats);
+        ierr += g_eth_stats.ierrors;
+        oerr += g_eth_stats.oerrors;
+        imis += g_eth_stats.imissed;
     }
 
     net_stats_format_print_err(ierr, ierrors, STATS_BUF_LEN);

@@ -10,6 +10,7 @@
 #include "timer/clock.h"
 #include "panel/panel.h"
 #include "common/rate_control.h"
+#include <rte_ethdev.h>
 
 struct dpdk_config;
 struct dpdk_config_percore;
@@ -45,6 +46,7 @@ struct dpdk_config
     char socket_mem[RTE_ARG_LEN];
     int tx_burst_size;
     int rx_burst_size;
+    const bool use_clear_nic_queue = false;
     dpdk_config(dpdk_config_user *user_config);
 };
 
@@ -64,7 +66,9 @@ struct dpdk_config_percore
     cpuload cpusage;
     dpdk_config_percore(dpdk_config *config);
     launch_control launch_ctls[MAX_PATTERNS];
-
+private:
+    uint64_t clear_nic_queue_next;
+public:
     static inline void cfg_send_packet(struct rte_mbuf *mbuf)
     {
         net_stats_tx(mbuf);
@@ -99,6 +103,14 @@ struct dpdk_config_percore
             {
                 net_stats_print_speed(0, g_config_percore->time.second.count);
             }
+#ifdef CLEAR_NIC
+            if(unlikely(g_config->use_clear_nic_queue && (g_config_percore->clear_nic_queue_next <= time_in_config()) && (g_eth_stats.ierrors > 1000000))){
+                rte_eth_dev_rx_queue_stop(g_config_percore->port_id, g_config_percore->queue_id);
+                rte_eth_dev_tx_queue_start(g_config_percore->port_id, g_config_percore->queue_id);
+                rte_eth_stats_reset(g_config_percore->port_id);
+                g_config_percore->clear_nic_queue_next += 10 * g_tsc_per_second;
+            }
+#endif
         }
     }
 

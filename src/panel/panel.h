@@ -2,6 +2,7 @@
 #define PANEL_H
 #include <stdint.h>
 #include <stdio.h>
+#include <rte_ethdev.h>
 
 /*
  * Each thread calculates CPU usage every second.
@@ -112,6 +113,7 @@ void net_stats_timer_handler();
 void net_stats_print_total(FILE *fp);
 void net_stats_print_speed(FILE *fp, int seconds);
 extern __thread struct net_stats g_net_stats;
+extern rte_eth_stats g_eth_stats;
 
 #define net_stats_socket_dup()        \
     do                                \

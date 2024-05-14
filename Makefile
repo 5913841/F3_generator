@@ -1,17 +1,18 @@
 APP := THUGEN
-EXAMPLES := examples/http_flood_primitive/client_multithread.cpp examples/http_flood_primitive/server_multithread.cpp \
-			examples/http_flood_primitive/client_mix.cpp examples/http_flood_primitive/server_mix.cpp \
-			examples/http_flood_primitive/server_nothttp.cpp examples/http_flood_primitive/client_nothttp.cpp \
+EXAMPLES := examples/trail/client_cps_core.cpp examples/trail/server_cps_core.cpp \
+  			# examples/http_flood_primitive/client_multithread.cpp examples/http_flood_primitive/server_multithread.cpp \
+			# examples/http_flood_primitive/client_mix.cpp examples/http_flood_primitive/server_mix.cpp \
+			# examples/http_flood_primitive/server_nothttp.cpp examples/http_flood_primitive/client_nothttp.cpp \
 			# examples/http_flood_primitive/server_preset.cpp examples/http_flood_primitive/client_preset.cpp \
 			# examples/http_flood/client_main.cpp examples/http_flood/server_main.cpp \
 			# examples/http_flood/client_nothttp.cpp examples/http_flood/server_nothttp.cpp \
-            #   examples/http_flood/client_preset.cpp examples/http_flood/server_preset.cpp \
-			#   examples/http_flood/server_multithread.cpp examples/http_flood/client_multithread.cpp \
-            #   examples/tcp_syn_flood/main.cpp \
-			#   examples/tcp_syn_flood/multithread.cpp \
-            #   examples/scanning/tcp_syn_flood.cpp \
-            #   examples/udp_flood/main.cpp \
-            #   examples/cc_attack/client_main.cpp examples/cc_attack/server_main.cpp
+            # examples/http_flood/client_preset.cpp examples/http_flood/server_preset.cpp \
+			# examples/http_flood/server_multithread.cpp examples/http_flood/client_multithread.cpp \
+            # examples/tcp_syn_flood/main.cpp \
+			# examples/tcp_syn_flood/multithread.cpp \
+        	# examples/scanning/tcp_syn_flood.cpp \
+            # examples/udp_flood/main.cpp \
+            # examples/cc_attack/client_main.cpp examples/cc_attack/server_main.cpp
 # EXAMPLES := examples/tcp_syn_flood/multithread.cpp
 
 SRCS-y := src/timer/*.cpp src/common/*.cpp src/dpdk/*.cpp src/multi_thread/*.cpp src/protocols/*.cpp src/socket/*.cpp src/panel/*.cpp src/socket/socket_table/*.cpp  src/socket/socket_vector/*.cpp src/dpdk/divert/*.cpp \
