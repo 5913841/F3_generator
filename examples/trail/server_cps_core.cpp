@@ -49,6 +49,7 @@ std::vector<int> parseStringToIntVector(const std::string& str) {
 int main(int argc, char **argv)
 {
     usrconfig.lcores = parseStringToIntVector(argv[1]);
+    usrconfig.queue_num_per_port = {(usrconfig.lcores.size())};
 
     set_configs_and_init(usrconfig, argv);
 

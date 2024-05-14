@@ -61,6 +61,7 @@ void random(Socket* socket)
 int main(int argc, char **argv)
 {
     usrconfig.lcores = parseStringToIntVector(argv[1]);
+    usrconfig.queue_num_per_port = {((int)usrconfig.lcores.size())};
 
     p_config.cps = argv[2];
 
