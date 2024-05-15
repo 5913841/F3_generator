@@ -31,16 +31,14 @@ protocol_config p_config1 = {
 
 protocol_config p_config2 = {
     .protocol = "TCP",
-    .mode = "client",
-    .preset = true,
+    .mode = "server",
+    .preset = false,
     .use_http = true,
     .use_keepalive = true,
-    .keepalive_interval = "300ms",
+    .keepalive_interval = "100ms",
     .keepalive_request_maxnum = "3",
     .launch_batch = "1",
-    .cps = "0",
-    .template_ip_src = "10.233.1.2",
-    .template_ip_dst = "10.233.1.3"
+    .cps = "1000M",
 };
 
 std::vector<int> parseStringToIntVector(const std::string& str) {
