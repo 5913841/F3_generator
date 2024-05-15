@@ -59,7 +59,6 @@ int thread_main(void* arg)
             primitives::socketsize_partby_pattern[socket.pattern]++;
             delete ths_socket;
         }
-        primitives::sockets_ready_to_add.pop_back();
     }
 
     primitives::sockets_ready_to_add.resize(0);

@@ -20,14 +20,28 @@ dpdk_config_user usrconfig = {
     .tx_burst_size = 64,
     .rx_burst_size = 64,
 };
-// 1core - 1.63M(launch batch = 4), 2core - 2.5M(launch batch = 1 arg cps = 3M) 4core - 2.48M(launch batch = 1 arg cps = 3M)
+// 1core - 1.37M, 
 
-protocol_config p_config = {
+protocol_config p_config1 = {
     .protocol = "TCP",
     .mode = "client",
     .preset = true,
     .use_http = false,
     .use_keepalive = false,
+    .launch_batch = "4",
+    .cps = "0",
+    .template_ip_src = "10.233.1.2",
+    .template_ip_dst = "10.233.1.3"
+};
+
+protocol_config p_config2 = {
+    .protocol = "TCP",
+    .mode = "client",
+    .preset = true,
+    .use_http = true,
+    .use_keepalive = true,
+    .keepalive_interval = "300ms",
+    .keepalive_request_maxnum = "3",
     .launch_batch = "1",
     .cps = "0",
     .template_ip_src = "10.233.1.2",
@@ -71,13 +85,15 @@ int main(int argc, char **argv)
         usrconfig.mq_rx_rss = true;
     }
 
-    p_config.cps = argv[2];
+    p_config1.cps = argv[2];
+    p_config2.cps = argv[3];
 
     set_configs_and_init(usrconfig, argv);
 
-    set_pattern_num(1);
+    set_pattern_num(2);
 
-    add_pattern(p_config);
+    add_pattern(p_config1);
+    add_pattern(p_config2);
 
     Socket* socket = new Socket(*template_socket);
     // set_random_method(random, 0);
@@ -85,6 +101,7 @@ int main(int argc, char **argv)
     {
         random(socket);
         add_fivetuples(*(FiveTuples*)socket, 0);
+        add_fivetuples(*(FiveTuples*)socket, 1);
     }
 
     run_setted();
