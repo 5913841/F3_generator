@@ -88,7 +88,7 @@ public:
 
     static inline void cfg_send_flush()
     {
-        tx_queue_flush(g_config_percore->tq, g_config_percore->port_id, g_config_percore->queue_id);
+        if(g_config_percore->lcore_id == 0) tx_queue_flush(g_config_percore->tq, g_config_percore->port_id, g_config_percore->queue_id);
     }
 
     static void enter_epoch()
