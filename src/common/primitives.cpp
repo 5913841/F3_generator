@@ -180,6 +180,13 @@ void primitives::set_pattern_num(int pattern_num)
 
 void primitives::add_pattern(protocol_config& p_config)
 {
+    int index = p_configs.size();
+
+    template_socket[index].src_addr = p_config.template_ip_src;
+    template_socket[index].dst_addr = p_config.template_ip_dst;
+    template_socket[index].src_port = atoi(p_config.template_port_src.data());
+    template_socket[index].dst_port = atoi(p_config.template_port_dst.data());
+    if(p_config.protocol == "TCP") template_socket[index].protocol = IPPROTO_TCP;
     p_configs.push_back(p_config);
 }
 

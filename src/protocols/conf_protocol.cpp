@@ -115,6 +115,13 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
     ether->port = g_config_percore->port;
     TCP::g_vars[pattern].flood = protocol_cfg->just_send_first_packet;
     if(protocol_cfg->protocol == "TCP"){
+        template_socket[pattern].protocol = IPPROTO_TCP;
+        template_socket[pattern].pattern = pattern;
+        template_socket[pattern].src_addr = ip4addr_t(protocol_cfg->template_ip_src);
+        template_socket[pattern].dst_addr = ip4addr_t(protocol_cfg->template_ip_dst);
+        template_socket[pattern].src_port = atoi(protocol_cfg->template_port_src.data());
+        template_socket[pattern].dst_port = atoi(protocol_cfg->template_port_dst.data());
+
         TCP::g_vars[pattern].global_keepalive = protocol_cfg->use_keepalive;
         if(TCP::g_vars[pattern].global_keepalive)
         {
@@ -170,13 +177,6 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
         template_http->http_parse_state = 0;
         template_http->http_flags = 0;
         template_http->http_ack = 0;
-
-        template_socket[pattern].protocol = IPPROTO_TCP;
-        template_socket[pattern].pattern = pattern;
-        template_socket[pattern].src_addr = ip4addr_t(protocol_cfg->template_ip_src);
-        template_socket[pattern].dst_addr = ip4addr_t(protocol_cfg->template_ip_dst);
-        template_socket[pattern].src_port = atoi(protocol_cfg->template_port_src.data());
-        template_socket[pattern].dst_port = atoi(protocol_cfg->template_port_dst.data());
 
         launch_control_init(&g_config_percore->launch_ctls[pattern], cps, cc, atoi(protocol_cfg->launch_batch.data()));
         constructor constructors[4];

@@ -17,14 +17,15 @@ dpdk_config_user usrconfig = {
     .gateway_for_ports = {"90:e2:ba:87:62:98"},
     .queue_num_per_port = {1},
     .always_accurate_time = false,
-    .tx_burst_size = 8,
-    .rx_burst_size = 2048,
+    .tx_burst_size = 64,
+    .rx_burst_size = 64,
 };
 // 1core - 1.37M, 
 
 protocol_config p_config = {
     .protocol = "TCP",
     .mode = "client",
+    .preset = true,
     .use_http = false,
     .use_keepalive = false,
     .cps = "0",
@@ -77,7 +78,13 @@ int main(int argc, char **argv)
 
     add_pattern(p_config);
 
-    set_random_method(random, 0);
+    Socket* socket = new Socket();
+    // set_random_method(random, 0);
+    for(int i = 0; i < 1000000; i++)
+    {
+        random(socket);
+        add_fivetuples(*(FiveTuples*)socket, 0);
+    }
 
     run_setted();
 }
