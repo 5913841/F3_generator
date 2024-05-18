@@ -1,6 +1,7 @@
 APP := THUGEN
 EXAMPLES := examples/trail/client_cps_core.cpp examples/trail/server_cps_core.cpp \
 			examples/trail/client_mix_cps_cpu.cpp examples/trail/server_mix_cps_cpu.cpp \
+			examples/trail/client_range_mem.cpp\
   			# examples/http_flood_primitive/client_multithread.cpp examples/http_flood_primitive/server_multithread.cpp \
 			# examples/http_flood_primitive/client_mix.cpp examples/http_flood_primitive/server_mix.cpp \
 			# examples/http_flood_primitive/server_nothttp.cpp examples/http_flood_primitive/client_nothttp.cpp \
