@@ -5,6 +5,9 @@
 !src/*
 !examples/**
 !src/**
+!data_process
+!data_process/*
+!data_process/**
 !dumpcap
 !*.sh
 !.gitignore

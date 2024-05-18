@@ -52,5 +52,5 @@ int main(int argc, char **argv)
         add_fivetuples(fivetuples, 0);
     }
 
-    run_setted();
+    run_generate();
 }

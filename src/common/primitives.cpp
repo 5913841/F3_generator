@@ -7,7 +7,8 @@ std::vector<protocol_config> primitives::p_configs;
 
 std::vector<Socket> primitives::sockets_ready_to_add;
 
-thread_local Socket* primitives::socket_partby_pattern = new Socket[MAX_PATTERNS * MAX_SOCKETS_RANGE_PER_PATTERN];
+// thread_local Socket* primitives::socket_partby_pattern = new Socket[MAX_PATTERNS * MAX_SOCKETS_RANGE_PER_PATTERN];
+thread_local Socket* primitives::socket_partby_pattern;
 
 thread_local int primitives::socketsize_partby_pattern[MAX_PATTERNS];
 
@@ -29,6 +30,15 @@ int get_index(int pattern, int index)
 int thread_main(void* arg)
 {
     memset(primitives::socketsize_partby_pattern, 0, sizeof(primitives::socketsize_partby_pattern));
+    int max_idx_of_preset = 0;
+    for(int i = 0; i < TCP::pattern_num; i++)
+    {
+        if(primitives::p_configs[i].preset)
+        {
+            max_idx_of_preset = std::max(max_idx_of_preset, i+1);
+        }
+    }
+    primitives::socket_partby_pattern = new Socket[max_idx_of_preset * MAX_SOCKETS_RANGE_PER_PATTERN];
 
     for(int i = 0; i < TCP::pattern_num ; i++)
     {
@@ -206,7 +216,7 @@ void primitives::set_total_time(std::string total_time)
 
 }
 
-void primitives::run_setted()
+void primitives::run_generate()
 {
     if(g_config->num_lcores == 1)
     {

@@ -87,5 +87,5 @@ int main(int argc, char **argv)
         add_fivetuples(*(FiveTuples*)socket, 0);
     }
 
-    run_setted();
+    run_generate();
 }

@@ -48,5 +48,5 @@ int main(int argc, char **argv)
 
     set_random_method(random, 0);
 
-    run_setted();
+    run_generate();
 }

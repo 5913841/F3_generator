@@ -50,5 +50,5 @@ int main(int argc, char **argv)
 
     add_pattern(p_config2);
 
-    run_setted();
+    run_generate();
 }

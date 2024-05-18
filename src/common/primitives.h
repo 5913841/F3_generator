@@ -36,7 +36,7 @@ void set_random_method(random_socket_t random_method, int pattern_num);
 
 void set_total_time(std::string total_time);
 
-void run_setted();
+void run_generate();
 
 
 }
