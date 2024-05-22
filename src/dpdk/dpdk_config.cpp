@@ -120,8 +120,18 @@ dpdk_config::dpdk_config(dpdk_config_user *user_config)
 dpdk_config_percore::dpdk_config_percore(dpdk_config *config)
 {
     lcore_id = rte_lcore_id();
-    port_id = lcore_id % config->num_ports;
-    queue_id = lcore_id / config->num_ports;
+    int tmp_id = lcore_id;
+    port_id = 0;
+    while(tmp_id >= 0)
+    {
+        tmp_id -= config->ports[port_id].queue_num;
+        port_id++;
+    }
+    port_id -= 1;
+    tmp_id += config->ports[port_id].queue_num;
+
+    queue_id = tmp_id;
+
     port = &config->ports[port_id];
     tick_time_init(&time);
     cpuload_init(&cpusage);
