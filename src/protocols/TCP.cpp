@@ -273,7 +273,7 @@ static inline void tcp_process_rst(struct Socket *sk, struct rte_mbuf *m)
     TCP *tcp = &sk->tcp;
     if (tcp->state != TCP_CLOSE)
     {
-        tcp_socket_close(sk);
+        tcp_unvalid_close(sk);
     }
 
     mbuf_free2(m);

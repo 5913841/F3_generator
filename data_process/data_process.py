@@ -25,14 +25,14 @@ area = 20  # 点面积
 lns1 = ax1.plot(arrx1, arry1, linewidth = '4', linestyle='--', color=colors1, label = "flow pattern 1", marker='o', markersize=area, markerfacecolor="None", markeredgecolor=colors1, markeredgewidth=4)
 
 for i in range(len(arrx1)):
-    ax1.text(arrx1[i]+0.01, arry1[i], f"({arrx1[i]}Mcps, {arry1[i]}%)", fontsize=20)
+    ax1.text(arrx1[i]+0.01, arry1[i]-1, f"({arrx1[i]}Mcps, {arry1[i]}%)", fontsize=40)
 
 ax1.set_xlim(0, 1.8)
 ax1.set_ylim(0, 100)
-ax1.set_xticks([x/10 for x in range(0, 20, 2)],[x/10 for x in range(0, 20, 2)],fontsize=20)
-ax1.set_yticks(list(range(10, 110, 10)),list(range(10, 110, 10)),rotation=-90,fontsize=20)
-ax1.set_xlabel('pattern 1 traffic rate Mcps', fontsize=30)
-ax1.set_ylabel('cpu usage %',fontsize=30)
+ax1.set_xticks([x/10 for x in range(0, 20, 2)],[x/10 for x in range(0, 20, 2)],fontsize=40)
+ax1.set_yticks(list(range(10, 110, 10)),list(range(10, 110, 10)),rotation=-90,fontsize=40)
+ax1.set_xlabel('pattern 1 traffic rate Mcps', fontsize=60)
+ax1.set_ylabel('cpu usage %',fontsize=60)
 
 arrx2 = np.array([0.39, 0.31, 0.23, 0.16, 0.08, 0.04])
 
@@ -44,18 +44,20 @@ area = 20  # 点面积
 lns2 = ax2.plot(arrx2, arry2, linewidth = '4', linestyle='--', color=colors2, label = "flow pattern 2", marker='s', markersize=area, markerfacecolor="None", markeredgecolor=colors2, markeredgewidth=4)
 
 for i in range(len(arrx2)):
-    ax2.text(arrx2[i]+0.01/4, arry2[i]-2, f"({arrx2[i]}Mcps, {arry2[i]}%)", fontsize=20)
-
+    if(i < 2):
+        ax2.text(arrx2[i]+0.04/4, arry2[i]-4, f"({arrx2[i]}Mcps, {arry2[i]}%)", fontsize=40)
+    else:
+        ax2.text(arrx2[i]+0.01/4, arry2[i]-3, f"({arrx2[i]}Mcps, {arry2[i]}%)", fontsize=40)
 
 ax2.set_xlim(0, 0.4)
 ax2.set_ylim(0, 100)
-ax2.set_xticks([x/10/4 for x in range(0, 20, 2)],[x/10/4 for x in range(0, 20, 2)],fontsize=20)
-ax2.set_yticks(list(range(10, 110, 10)),list(range(10, 110, 10)),rotation=-90,fontsize=20)
-ax2.set_xlabel('pattern 2 traffic rate Mcps', fontsize=30)
+ax2.set_xticks([x/10/4 for x in range(0, 20, 2)],[x/10/4 for x in range(0, 20, 2)],fontsize=40)
+ax2.set_yticks(list(range(10, 110, 10)),list(range(10, 110, 10)),rotation=-90,fontsize=40)
+ax2.set_xlabel('pattern 2 traffic rate Mcps', fontsize=60)
 ax2.xaxis.tick_top()
 ax2.xaxis.set_label_position('top')
 
-ax1.legend(lns1+lns2, [lns1[0].get_label(), lns2[0].get_label()], fontsize=32, shadow=True)
+ax1.legend(lns1+lns2, [lns1[0].get_label(), lns2[0].get_label()], fontsize=64, shadow=True)
 fig.tight_layout()
 # plt.grid(True)
 plt.savefig('./pattern_compare.png')
@@ -67,7 +69,7 @@ matplotlib.use('Agg')
 plt.rcParams['font.sans-serif']=['SimHei']
 plt.rcParams['axes.unicode_minus'] = False
 
-plt.rcParams['figure.figsize'] = (30.0, 20.0)
+plt.rcParams['figure.figsize'] = (30.0, 23.0)
 
 
 arry3_add = np.array(arry1[1:])[::-1] + np.array(arry2[1:])
@@ -80,7 +82,7 @@ area = 20  # 点面积
 lns1 = plt.plot(list(range(1,6)), arry3_add, linewidth = '4', linestyle='--', color=colors1, label = "flow pattern add 1 and 2", marker='o', markersize=area, markerfacecolor="None", markeredgecolor=colors1, markeredgewidth=4)
 
 for i in range(5):
-    plt.text(i+1+0.01, arry3_add[i], f"({arrx1[5-i]}+{arrx2[i+1]}Mcps, {arry3_add[i]}%)", fontsize=20)
+    plt.text(i+1+0.01, arry3_add[i], f"({arrx1[5-i]}+{arrx2[i+1]}Mcps, {arry3_add[i]}%)", fontsize=40)
 
 colors2 = '#00B2F1' #点的颜色
 area = 20  # 点面积
@@ -88,16 +90,16 @@ area = 20  # 点面积
 lns2 = plt.plot(list(range(1,6)), arry3_mix, linewidth = '4', linestyle='--', color=colors2, label = "flow pattern mix 1 and 2", marker='s', markersize=area, markerfacecolor="None", markeredgecolor=colors2, markeredgewidth=4)
 
 for i in range(5):
-    plt.text(i+1+0.01, arry3_mix[i]-0.2, f"({arrx1[5-i]}+{arrx2[i+1]}Mcps, {arry3_mix[i]}%)", fontsize=20)
+    plt.text(i+1+0.01, arry3_mix[i]-0.2, f"({arrx1[5-i]}+{arrx2[i+1]}Mcps, {arry3_mix[i]}%)", fontsize=40)
 
-plt.xlim(0, 6)
+plt.xlim(0, 7)
 plt.ylim(90, 110)
-plt.xticks(list(range(1,6)),[f"{arrx1[5-i-1]}+{arrx2[i]}Mcps" for i in range(5)],fontsize=20)
-plt.yticks(list(range(90, 112, 2)),list(range(90, 112, 2)),rotation=-90,fontsize=20)
-plt.xlabel('pattern 1 and 2 traffic rate Mcps', fontsize=30)
-plt.ylabel('cpu usage %',fontsize=30)
+plt.xticks(list(range(1,6)),[f"{arrx1[5-i-1]}+{arrx2[i]}" for i in range(5)],fontsize=40)
+plt.yticks(list(range(90, 112, 2)),list(range(90, 112, 2)),rotation=-90,fontsize=40)
+plt.xlabel('pattern 1 and 2 traffic rate Mcps', fontsize=60)
+plt.ylabel('cpu usage %',fontsize=60)
 
-plt.legend(fontsize=32, shadow=True)
+plt.legend(fontsize=52, shadow=True, bbox_to_anchor=(0.5, 1.01), loc = 3, borderaxespad=0.)
 plt.savefig('./pattern_mix.png')
 
 plt.cla()
@@ -127,14 +129,15 @@ for key in data:
 arr = np.array(arr)
 keys = np.array(list(data.keys()))
 
-plt.ylim(0.99999, 1.00005)
-plt.xlabel('Set Rate (Mbps)',fontsize=30)
-plt.ylabel('Actual Rate / Set Rate' ,fontsize=30)
-plt.yticks(np.arange(0.99999, 1.00005, 0.00001),["1-1e-05", "1", "1+1e-05", "1+2e-05", "1+3e-05", "1+4e-05", "1+5e-05"] ,fontsize=20)
-plt.xticks(fontsize=20)
+# plt.ylim(0.99999, 1.00005)
+plt.yscale('symlog')
+plt.xlabel('Set Rate (Mbps)',fontsize=60)
+plt.ylabel('Actual Rate - Set Rate' ,fontsize=60)
+plt.yticks(fontsize=40)
+plt.xticks(fontsize=40)
 # plt.boxplot((arr.T / keys.T), labels=keys, sym="r+", showmeans=True)
-plt.boxplot(x = (arr.T / keys.T),     # 绘图数据 
-            labels=keys,                  # 标签
+plt.boxplot(x = arr.T-keys,     # 绘图数据 
+            labels=keys/1000000,                  # 标签
             whis=3,                     # 设置IQR的范围，默认是1.5倍的箱线范围
             showfliers=True,              # 设置是否显示异常值，默认显示
             # notch = True,      #设置中位线处凹陷，（注意：下图看起来有点丑）

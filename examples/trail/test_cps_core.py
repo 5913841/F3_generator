@@ -1,4 +1,5 @@
-THUGEN_PATH = "~/THUGEN/"
+# invalid
+THUGEN_PATH = "~/F3_generator/"
 
 core_num = 4
 
