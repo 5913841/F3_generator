@@ -61,10 +61,10 @@ void random(Socket* socket)
 // argv[1] = lcores
 // argv[2] = cps
 // argv[3] = launch_batch
+// argv[4] = numqueues1,numqueues2
 int main(int argc, char **argv)
 {
     usrconfig.lcores = parseStringToIntVector(argv[1]);
-    usrconfig.queue_num_per_port = {4, ((int)usrconfig.lcores.size() - 4)};
     if (usrconfig.lcores.size() > 1)
     {
         usrconfig.flow_distribution_strategy = "rss";
@@ -74,6 +74,7 @@ int main(int argc, char **argv)
 
     p_config.cps = argv[2];
     p_config.launch_batch = argv[3];
+    usrconfig.queue_num_per_port = parseStringToIntVector(argv[4]);
 
     set_configs_and_init(usrconfig, argv);
 

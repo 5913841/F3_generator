@@ -37,7 +37,7 @@ dperf_memuse = np.array([0.16, 0.31, 0.63, 1.25, 2.50]) # GB
 fivetuples_log2 = np.array([21, 22, 23, 24, 25])
 
 lns1 = ax1.plot(fivetuples_log2, dperf_memuse, 'o', label='D-Perf', markersize=40, color='red', linewidth = '4', linestyle='--')
-lns2 = ax2.plot(fivetuples_log2, THUGEN_memuse / 1024 / 1024, 'o', label='THUGEN', markersize=40, color='blue', linewidth = '4', linestyle='--')
+lns2 = ax2.plot(fivetuples_log2, THUGEN_memuse / 1024 / 1024, 'o', label='F3', markersize=40, color='blue', linewidth = '4', linestyle='--')
 for i in range(len(fivetuples_log2)):
     ax1.text(fivetuples_log2[i]+0.01, dperf_memuse[i]-0.07, f"(2^{fivetuples_log2[i]}fivetuples, {dperf_memuse[i]}GB)", fontsize=40)
     if i % 2 == 0:
