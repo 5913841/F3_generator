@@ -1,0 +1,24 @@
+#ifndef GLOBAL_STATES_H
+#define GLOBAL_STATES_H
+
+#include <stdint.h>
+#include <protocols/TCP.h>
+#include <protocols/UDP.h>
+#include <protocols/HTTP.h>
+
+enum protocol_type {
+    p_tcp,
+    p_udp,
+};
+
+struct global_states {
+    protocol_type p_type;
+    global_tcp_vars tcp_vars;
+    global_udp_vars udp_vars;
+    global_http_vars http_vars;
+};
+
+extern __thread struct global_states g_vars[MAX_PATTERNS];
+extern int g_pattern_num;
+
+#endif

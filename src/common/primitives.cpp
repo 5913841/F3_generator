@@ -1,5 +1,6 @@
 #include "common/primitives.h"
 #include <vector>
+#include "protocols/global_states.h"
 
 dpdk_config * primitives::dpdk_config_pri;
 
@@ -31,7 +32,7 @@ int thread_main(void* arg)
 {
     memset(primitives::socketsize_partby_pattern, 0, sizeof(primitives::socketsize_partby_pattern));
     int max_idx_of_preset = 0;
-    for(int i = 0; i < TCP::pattern_num; i++)
+    for(int i = 0; i < g_pattern_num; i++)
     {
         if(primitives::p_configs[i].preset)
         {
@@ -40,7 +41,7 @@ int thread_main(void* arg)
     }
     primitives::socket_partby_pattern = new Socket[max_idx_of_preset * MAX_SOCKETS_RANGE_PER_PATTERN];
 
-    for(int i = 0; i < TCP::pattern_num ; i++)
+    for(int i = 0; i < g_pattern_num ; i++)
     {
         config_protocols(i, &primitives::p_configs[i]);
     }
@@ -51,23 +52,25 @@ int thread_main(void* arg)
         {
             continue;
         }
-        if(TCP::g_vars[socket.pattern].server)
-        {
-            Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
-            memcpy(ths_socket, &socket, sizeof(FiveTuples));
-            ths_socket->protocol = IPPROTO_TCP;
-            tcp_validate_csum(ths_socket);
-            TCP::socket_table->insert_socket(ths_socket);
-        }
-        else
-        {
-            Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
-            memcpy(ths_socket, &socket, sizeof(FiveTuples));
-            ths_socket->protocol = IPPROTO_TCP;
-            tcp_validate_csum(ths_socket);
-            primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
-            primitives::socketsize_partby_pattern[socket.pattern]++;
-            delete ths_socket;
+        if(g_vars[socket.pattern].p_type == p_tcp){
+            if(g_vars[socket.pattern].tcp_vars.server)
+            {
+                Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
+                memcpy(ths_socket, &socket, sizeof(FiveTuples));
+                ths_socket->protocol = IPPROTO_TCP;
+                tcp_validate_csum(ths_socket);
+                TCP::socket_table->insert_socket(ths_socket);
+            }
+            else
+            {
+                Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
+                memcpy(ths_socket, &socket, sizeof(FiveTuples));
+                ths_socket->protocol = IPPROTO_TCP;
+                tcp_validate_csum(ths_socket);
+                primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
+                primitives::socketsize_partby_pattern[socket.pattern]++;
+                delete ths_socket;
+            }
         }
     }
 
@@ -82,23 +85,25 @@ int thread_main(void* arg)
         #pragma unroll
         do
         {
+            recv_num++;
             rte_mbuf *m = dpdk_config_percore::cfg_recv_packet();
             dpdk_config_percore::time_update();
             if (!m)
             {
                 break;
             }
-            recv_num++;
             uint8_t pattern = get_packet_pattern(m);
-            Socket* parse_socket = parse_packet(m);
-            Socket *socket = TCP::socket_table->find_socket(parse_socket);
-            if (socket == nullptr)
-            {
-                socket = tcp_new_socket(&template_socket[pattern]);
-                socket->pattern = pattern;
-                memcpy(socket, parse_socket, sizeof(FiveTuples));
+            if(g_vars[pattern].p_type == p_tcp){
+                Socket* parse_socket = parse_packet(m);
+                Socket *socket = TCP::socket_table->find_socket(parse_socket);
+                if (socket == nullptr)
+                {
+                    socket = tcp_new_socket(&template_socket[pattern]);
+                    socket->pattern = pattern;
+                    memcpy(socket, parse_socket, sizeof(FiveTuples));
+                }
+                socket->tcp.process(socket, m);
             }
-            socket->tcp.process(socket, m);
         } while (recv_num < 4);
 
         dpdk_config_percore::cfg_send_flush();
@@ -106,67 +111,74 @@ int thread_main(void* arg)
         #pragma unroll
         for (int i = 0; i < MAX_PATTERNS; i++)
         {
-            if(i >= TCP::pattern_num)
+            if(i >= g_pattern_num)
                 break;
-            
-            if(TCP::g_vars[i].use_http) http_ack_delay_flush(i);
-            
-            if (TCP::g_vars[i].server)
+            if(g_vars[i].p_type == p_tcp)
             {
-                continue;
-            }
-            else
-            {
-                int fail_cnt = 0;
-                int launch_num = dpdk_config_percore::check_epoch_timer(i);
-                if(TCP::g_vars[i].preset)
+                if(g_vars[i].tcp_vars.use_http) http_ack_delay_flush(i);
+                
+                if (g_vars[i].tcp_vars.server)
                 {
-                    for (int j = 0; j < launch_num; j++)
-                    {
-                        dpdk_config_percore::time_update();
-repick:
-                        Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
-                        primitives::socketpointer_partby_pattern[i]++;
-                        
-                        if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
-                        {
-                            primitives::socketpointer_partby_pattern[i] = 0;
-                        }
-
-                        if (TCP::socket_table->insert_socket(socket) == -1)
-                        {
-                            if(unlikely(fail_cnt >= 5))
-                            {
-                                goto continue_epoch;
-                            }
-                            fail_cnt++;
-                            goto repick;
-                        }
-                        tcp_launch(socket);
-                    }
+                    continue;
                 }
                 else
                 {
-                    for (int j = 0; j < launch_num; j++)
+                    int fail_cnt = 0;
+                    int launch_num = dpdk_config_percore::check_epoch_timer(i);
+                    if(g_vars[i].tcp_vars.preset)
                     {
-                        dpdk_config_percore::time_update();
-                        Socket *socket = tcp_new_socket(&template_socket[i]);
-rerand:
-                        primitives::random_methods[i](socket);
-
-                        if (!rss_check_socket(socket) || TCP::socket_table->insert_socket(socket) == -1)
+                        for (int j = 0; j < launch_num; j++)
                         {
-                            if(unlikely(fail_cnt >= 5))
+                            dpdk_config_percore::time_update();
+repick:
+                            Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
+                            primitives::socketpointer_partby_pattern[i]++;
+                            
+                            if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
                             {
-                                goto continue_epoch;
+                                primitives::socketpointer_partby_pattern[i] = 0;
                             }
-                            fail_cnt++;
-                            goto rerand;
+
+                            if (TCP::socket_table->insert_socket(socket) == -1)
+                            {
+                                if(unlikely(fail_cnt >= 5))
+                                {
+                                    goto continue_epoch;
+                                }
+                                fail_cnt++;
+                                goto repick;
+                            }
+                            tcp_launch(socket);
                         }
-                        tcp_validate_csum(socket);
-                        tcp_launch(socket);
+                    }
+                    else
+                    {
+                        for (int j = 0; j < launch_num; j++)
+                        {
+                            dpdk_config_percore::time_update();
+                            Socket *socket = tcp_new_socket(&template_socket[i]);
+rerand:
+                            primitives::random_methods[i](socket);
+
+                            if (!rss_check_socket(socket) || TCP::socket_table->insert_socket(socket) == -1)
+                            {
+                                if(unlikely(fail_cnt >= 5))
+                                {
+                                    goto continue_epoch;
+                                }
+                                fail_cnt++;
+                                goto rerand;
+                            }
+                            tcp_validate_csum(socket);
+                            tcp_launch(socket);
+                        }
                     }
                 }
+            }
+            else if(g_vars[i].p_type == p_udp)
+            {
+                int launch_num = dpdk_config_percore::check_epoch_timer(i);
+
             }
         }
 continue_epoch:
@@ -183,8 +195,7 @@ void primitives::set_configs_and_init(dpdk_config_user& usrconfig, char** argv)
 
 void primitives::set_pattern_num(int pattern_num)
 {
-    TCP::pattern_num = pattern_num;
-    HTTP::pattern_num = pattern_num;
+    g_pattern_num = pattern_num;
 }
 
 void primitives::add_pattern(protocol_config& p_config)
@@ -195,7 +206,16 @@ void primitives::add_pattern(protocol_config& p_config)
     template_socket[index].dst_addr = p_config.template_ip_dst;
     template_socket[index].src_port = atoi(p_config.template_port_src.data());
     template_socket[index].dst_port = atoi(p_config.template_port_dst.data());
-    if(p_config.protocol == "TCP") template_socket[index].protocol = IPPROTO_TCP;
+    if(p_config.protocol == "TCP")
+    {
+        template_socket[index].protocol = IPPROTO_TCP;
+        g_vars[index].p_type = p_tcp;
+    }
+    else if(p_config.protocol == "UDP")
+    {
+        template_socket[index].protocol = IPPROTO_UDP;
+        g_vars[index].p_type = p_udp;
+    }
     p_configs.push_back(p_config);
 }
 

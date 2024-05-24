@@ -74,8 +74,6 @@ public:
     uint8_t retrans : 3;
     uint8_t keepalive : 1;
     uint8_t flags; /* tcp flags*/
-    static int pattern_num;
-    static __thread global_tcp_vars g_vars[MAX_PATTERNS];
     static thread_local SocketPointerTable* socket_table;
 
     static tcphdr *decode_hdr_pre(rte_mbuf *data)

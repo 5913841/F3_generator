@@ -5,6 +5,7 @@
 #include "timer/clock.h"
 #include "dpdk/dpdk_config.h"
 
+
 class HTTP;
 
 extern thread_local HTTP *parser_http;
@@ -61,8 +62,6 @@ public:
     uint8_t snd_window;
     uint32_t snd_max;
     HTTP_STATE state;
-    static int pattern_num;
-    static __thread global_http_vars g_vars[MAX_PATTERNS];
     
     // #endif
     inline int construct(Socket *socket, rte_mbuf *data)
@@ -118,14 +117,7 @@ static inline void socket_init_http(struct HTTP *http)
     http->http_ack = 0;
 }
 
-static inline void socket_init_http_server(struct HTTP *http, TCP *tcp, int pattern)
-{
-    http->http_length = 0;
-    http->http_parse_state = 0;
-    http->http_flags = 0;
-    http->http_ack = 0;
-    http->snd_max = tcp->snd_nxt + (uint32_t)HTTP::g_vars[pattern].payload_size;
-}
+void socket_init_http_server(struct HTTP *http, TCP *tcp, int pattern);
 
 // #else
 // #define socket_init_http(http) do{}while(0)

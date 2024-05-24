@@ -9,18 +9,11 @@
 // #include <sys/time.h>
 // #include <rte_mbuf.h>
 
-// __thread mbuf_cache *UDP::template_udp_pkt;
-// __thread uint8_t UDP::pipeline;
-// __thread bool UDP::flood;
-// __thread int UDP::global_duration_time;
-// __thread bool UDP::global_stop;
-// __thread bool UDP::payload_random;
-// __thread uint64_t UDP::keepalive_request_interval;
-// __thread void (*UDP::release_socket_callback)(Socket *sk);
+// __thread global_udp_vars UDP::g_vars[MAX_PATTERNS];
 // void udp_start_keepalive_timer(struct Socket *sk, uint64_t now_tsc);
 
 // static __thread char g_udp_data[MBUF_DATA_SIZE] = "hello THUGEN!!\n";
-// void udp_set_payload(char *data, int len, int new_line)
+// void udp_set_payload(char *data, int len, int new_line, int pattern_id)
 // {
 //     int i = 0;
 //     int num = 'z' - 'a' + 1;
@@ -32,7 +25,7 @@
 //         return;
 //     }
 
-//     if (!UDP::payload_random)
+//     if (!UDP::g_vars[pattern_id].payload_random)
 //     {
 //         memset(data, 'a', len);
 //     }
@@ -54,9 +47,9 @@
 //     data[len] = 0;
 // }
 
-// void udp_set_payload(int page_size)
+// void udp_set_payload(int page_size, int pattern_id)
 // {
-//     udp_set_payload(g_udp_data, page_size, 1);
+//     udp_set_payload(g_udp_data, page_size, 1, pattern_id);
 // }
 
 // static inline struct rte_mbuf *udp_new_packet(struct Socket *sk)

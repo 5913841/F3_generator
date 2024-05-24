@@ -1,4 +1,5 @@
 #include "protocols/conf_protocol.h"
+#include "protocols/global_states.h"
 
 thread_local struct ETHER *ether = new ETHER();
 thread_local struct IPV4 ip[MAX_PATTERNS];
@@ -113,8 +114,9 @@ uint64_t config_parse_time(const char *str)
 void config_protocols(int pattern, protocol_config *protocol_cfg)
 {
     ether->port = g_config_percore->port;
-    TCP::g_vars[pattern].flood = protocol_cfg->just_send_first_packet;
     if(protocol_cfg->protocol == "TCP"){
+        g_vars[pattern].tcp_vars.flood = protocol_cfg->just_send_first_packet;
+        g_vars[pattern].p_type = p_tcp;
         template_socket[pattern].protocol = IPPROTO_TCP;
         template_socket[pattern].pattern = pattern;
         template_socket[pattern].src_addr = ip4addr_t(protocol_cfg->template_ip_src);
@@ -122,56 +124,56 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
         template_socket[pattern].src_port = atoi(protocol_cfg->template_port_src.data());
         template_socket[pattern].dst_port = atoi(protocol_cfg->template_port_dst.data());
 
-        TCP::g_vars[pattern].global_keepalive = protocol_cfg->use_keepalive;
-        if(TCP::g_vars[pattern].global_keepalive)
+        g_vars[pattern].tcp_vars.global_keepalive = protocol_cfg->use_keepalive;
+        if(g_vars[pattern].tcp_vars.global_keepalive)
         {
-            TCP::g_vars[pattern].keepalive_request_interval = config_parse_time(protocol_cfg->keepalive_interval.data());
-            TCP::g_vars[pattern].setted_keepalive_request_num = atoi(protocol_cfg->keepalive_request_maxnum.data());
-            if(TCP::g_vars[pattern].setted_keepalive_request_num == 0 && protocol_cfg->keepalive_timeout != "0s")
+            g_vars[pattern].tcp_vars.keepalive_request_interval = config_parse_time(protocol_cfg->keepalive_interval.data());
+            g_vars[pattern].tcp_vars.setted_keepalive_request_num = atoi(protocol_cfg->keepalive_request_maxnum.data());
+            if(g_vars[pattern].tcp_vars.setted_keepalive_request_num == 0 && protocol_cfg->keepalive_timeout != "0s")
             {
-                TCP::g_vars[pattern].setted_keepalive_request_num = round(double(config_parse_time(protocol_cfg->keepalive_timeout.data())) / TCP::g_vars[pattern].keepalive_request_interval);
+                g_vars[pattern].tcp_vars.setted_keepalive_request_num = round(double(config_parse_time(protocol_cfg->keepalive_timeout.data())) / g_vars[pattern].tcp_vars.keepalive_request_interval);
             }
         }
 
         if (protocol_cfg->mode == "server")
         {
-            TCP::g_vars[pattern].server = true;
+            g_vars[pattern].tcp_vars.server = true;
         }
         else if (protocol_cfg->mode == "client")
         {
-            TCP::g_vars[pattern].server = false;
+            g_vars[pattern].tcp_vars.server = false;
         }
         else
         {
             printf("Invalid mode for TCP, using default mode (client)");
-            TCP::g_vars[pattern].server = false;
+            g_vars[pattern].tcp_vars.server = false;
         }
         int cc = config_parse_number(protocol_cfg->cc.c_str(), true, true);
         int cps = config_parse_number(protocol_cfg->cps.c_str(), true, true);
-        TCP::g_vars[pattern].tos = atoi(protocol_cfg->tos.data());
-        TCP::g_vars[pattern].template_tcp_data = &template_tcp_data[pattern];
-        TCP::g_vars[pattern].template_tcp_opt = &template_tcp_opt[pattern];
-        TCP::g_vars[pattern].template_tcp_pkt = &template_tcp_pkt[pattern];
-        TCP::g_vars[pattern].preset = protocol_cfg->preset;
-        TCP::g_vars[pattern].use_http = protocol_cfg->use_http;
-        TCP::g_vars[pattern].global_mss = atoi(protocol_cfg->mss.data());
+        g_vars[pattern].tcp_vars.tos = atoi(protocol_cfg->tos.data());
+        g_vars[pattern].tcp_vars.template_tcp_data = &template_tcp_data[pattern];
+        g_vars[pattern].tcp_vars.template_tcp_opt = &template_tcp_opt[pattern];
+        g_vars[pattern].tcp_vars.template_tcp_pkt = &template_tcp_pkt[pattern];
+        g_vars[pattern].tcp_vars.preset = protocol_cfg->preset;
+        g_vars[pattern].tcp_vars.use_http = protocol_cfg->use_http;
+        g_vars[pattern].tcp_vars.global_mss = atoi(protocol_cfg->mss.data());
 
         TCP* template_tcp = &template_socket[pattern].tcp;
-        data[pattern] = TCP::g_vars[pattern].server ? http_get_response(pattern) : http_get_request(pattern);
+        data[pattern] = g_vars[pattern].tcp_vars.server ? http_get_response(pattern) : http_get_request(pattern);
         template_tcp->retrans = 0;
         template_tcp->keepalive_request_num = 0;
-        template_tcp->keepalive = TCP::g_vars[pattern].global_keepalive;
+        template_tcp->keepalive = g_vars[pattern].tcp_vars.global_keepalive;
         uint32_t seed = (uint32_t)rte_rdtsc();
         template_tcp->snd_nxt = rand_r(&seed);
         template_tcp->snd_una = template_tcp->snd_nxt;
         template_tcp->rcv_nxt = 0;
         template_tcp->state = TCP_CLOSE;
 
-        HTTP::g_vars[pattern].payload_size = atoi(protocol_cfg->payload_size.data());
-        HTTP::g_vars[pattern].payload_random = protocol_cfg->payload_random;
-        strcpy(HTTP::g_vars[pattern].http_host, HTTP_HOST_DEFAULT);
-        strcpy(HTTP::g_vars[pattern].http_path, HTTP_PATH_DEFAULT);
-        http_set_payload(HTTP::g_vars[pattern].payload_size, pattern);
+        g_vars[pattern].http_vars.payload_size = atoi(protocol_cfg->payload_size.data());
+        g_vars[pattern].http_vars.payload_random = protocol_cfg->payload_random;
+        strcpy(g_vars[pattern].http_vars.http_host, HTTP_HOST_DEFAULT);
+        strcpy(g_vars[pattern].http_vars.http_path, HTTP_PATH_DEFAULT);
+        http_set_payload(g_vars[pattern].http_vars.payload_size, pattern);
         HTTP* template_http = &template_socket[pattern].http;
         template_http->http_length = 0;
         template_http->http_parse_state = 0;
@@ -188,7 +190,7 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
         mbuf_template_pool_setby_constructors(template_tcp_data + pattern, template_socket + pattern, constructors, data[pattern], strlen(data[pattern]));
         template_tcp_pkt[pattern].mbuf_pool = mbuf_pool_create(g_config, (std::string("template_tcp_pkt") + "_" + std::to_string(g_config_percore->lcore_id) + "_" + (std::to_string(pattern))).c_str(), g_config_percore->port_id, g_config_percore->queue_id);
         mbuf_template_pool_setby_constructors(template_tcp_pkt + pattern, template_socket + pattern, constructors, nullptr, 0);
-        TCP::g_vars[pattern].constructing_opt_tmeplate = true;
+        g_vars[pattern].tcp_vars.constructing_opt_tmeplate = true;
         template_tcp_opt[pattern].mbuf_pool = mbuf_pool_create(g_config, (std::string("template_tcp_opt") + "_" + std::to_string(g_config_percore->lcore_id) + "_" + (std::to_string(pattern))).c_str(), g_config_percore->port_id, g_config_percore->queue_id);
         mbuf_template_pool_setby_constructors(template_tcp_opt + pattern, template_socket + pattern, constructors, nullptr, 0);
 

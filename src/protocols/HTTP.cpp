@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <sys/time.h>
 #include "socket/socket.h"
+#include "protocols/global_states.h"
 
 #define HTTP_REQ_FORMAT     \
     "GET %s HTTP/1.1\r\n"   \
@@ -27,8 +28,15 @@ static const char *http_rsp_body_default = "hello THUGEN!\r\n";
 
 thread_local HTTP *parser_http = new HTTP();
 
-int HTTP::pattern_num;
-__thread global_http_vars HTTP::g_vars[MAX_PATTERNS];
+
+void socket_init_http_server(struct HTTP *http, TCP *tcp, int pattern)
+{
+    http->http_length = 0;
+    http->http_parse_state = 0;
+    http->http_flags = 0;
+    http->http_ack = 0;
+    http->snd_max = tcp->snd_nxt + (uint32_t)g_vars[pattern].http_vars.payload_size;
+}
 
 const char *http_get_request(int pattern = 0)
 {
@@ -67,13 +75,13 @@ void http_ack_delay_add(struct Socket *sk)
         return;
     }
 
-    if (HTTP::g_vars[sk->pattern].ack_delay.next >= HTTP_ACK_DELAY_MAX)
+    if (g_vars[sk->pattern].http_vars.ack_delay.next >= HTTP_ACK_DELAY_MAX)
     {
         http_ack_delay_flush(sk->pattern);
     }
 
-    HTTP::g_vars[sk->pattern].ack_delay.sockets[HTTP::g_vars[sk->pattern].ack_delay.next] = sk;
-    HTTP::g_vars[sk->pattern].ack_delay.next++;
+    g_vars[sk->pattern].http_vars.ack_delay.sockets[g_vars[sk->pattern].http_vars.ack_delay.next] = sk;
+    g_vars[sk->pattern].http_vars.ack_delay.next++;
     http->http_ack = 1;
 }
 
@@ -82,9 +90,9 @@ int http_ack_delay_flush(int pattern)
     int i = 0;
     struct Socket *sk = NULL;
 
-    for (i = 0; i < HTTP::g_vars[pattern].ack_delay.next; i++)
+    for (i = 0; i < g_vars[pattern].http_vars.ack_delay.next; i++)
     {
-        sk = HTTP::g_vars[pattern].ack_delay.sockets[i];
+        sk = g_vars[pattern].http_vars.ack_delay.sockets[i];
         HTTP *http = &sk->http;
         TCP *tcp = &sk->tcp;
         if (http->http_ack)
@@ -97,9 +105,9 @@ int http_ack_delay_flush(int pattern)
         }
     }
 
-    if (HTTP::g_vars[pattern].ack_delay.next > 0)
+    if (g_vars[pattern].http_vars.ack_delay.next > 0)
     {
-        HTTP::g_vars[pattern].ack_delay.next = 0;
+        g_vars[pattern].http_vars.ack_delay.next = 0;
     }
 
     return 0;
@@ -475,7 +483,7 @@ void http_set_payload(char *data, int len, int new_line, int pattern)
         return;
     }
 
-    if (!HTTP::g_vars[pattern].payload_random)
+    if (!g_vars[pattern].http_vars.payload_random)
     {
         memset(data, 'a', len);
     }
@@ -504,7 +512,7 @@ static void http_set_payload_client(char *dest, int len, int payload_size, int p
 
     if (payload_size <= 0)
     {
-        snprintf(dest, len, HTTP_REQ_FORMAT, HTTP::g_vars[pattern].http_path, HTTP::g_vars[pattern].http_host);
+        snprintf(dest, len, HTTP_REQ_FORMAT, g_vars[pattern].http_vars.http_path, g_vars[pattern].http_vars.http_host);
     }
     else if (payload_size < HTTP_DATA_MIN_SIZE)
     {
@@ -518,7 +526,7 @@ static void http_set_payload_client(char *dest, int len, int payload_size, int p
             http_set_payload(buf, pad, 0, pattern);
         }
         buf[0] = '/';
-        snprintf(dest, len, HTTP_REQ_FORMAT, buf, HTTP::g_vars[pattern].http_host);
+        snprintf(dest, len, HTTP_REQ_FORMAT, buf, g_vars[pattern].http_vars.http_host);
     }
 }
 
@@ -540,9 +548,9 @@ static void http_set_payload_server(char *dest, int len, int payload_size, int p
     }
     else
     {
-        if (payload_size > TCP::g_vars[pattern].global_mss)
+        if (payload_size > g_vars[pattern].tcp_vars.global_mss)
         {
-            pad = TCP::g_vars[pattern].global_mss - HTTP_DATA_MIN_SIZE;
+            pad = g_vars[pattern].tcp_vars.global_mss - HTTP_DATA_MIN_SIZE;
         }
         else
         {
@@ -560,13 +568,13 @@ static void http_set_payload_server(char *dest, int len, int payload_size, int p
 
 void http_set_payload(int payload_size, int pattern)
 {
-    if (TCP::g_vars[pattern].server)
+    if (g_vars[pattern].tcp_vars.server)
     {
-        http_set_payload_server(http_rsp[pattern], MBUF_DATA_SIZE, HTTP::g_vars[pattern].payload_size, pattern);
+        http_set_payload_server(http_rsp[pattern], MBUF_DATA_SIZE, g_vars[pattern].http_vars.payload_size, pattern);
     }
     else
     {
-        http_set_payload_client(http_req[pattern], MBUF_DATA_SIZE, HTTP::g_vars[pattern].payload_size, pattern);
+        http_set_payload_client(http_req[pattern], MBUF_DATA_SIZE, g_vars[pattern].http_vars.payload_size, pattern);
     }
 }
 

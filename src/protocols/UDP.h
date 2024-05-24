@@ -14,6 +14,15 @@ int udp_launch(Socket *socket);
 struct rte_mbuf *udp_send(Socket *socket);
 char *udp_get_payload();
 
+struct global_udp_vars {
+    uint8_t pipeline;
+    bool flood;
+    int global_duration_time;
+    bool global_stop;
+    bool payload_random;
+    uint64_t keepalive_request_interval;
+};
+
 struct UDP
 {
 public:
@@ -23,14 +32,6 @@ public:
     uint16_t keepalive_request_num : 15;
     uint16_t keepalive : 1;
     uint64_t timer_tsc;
-    static __thread void (*release_socket_callback)(Socket *sk);
-    static __thread mbuf_cache *template_udp_pkt;
-    static __thread uint8_t pipeline;
-    static __thread bool flood;
-    static __thread int global_duration_time;
-    static __thread bool global_stop;
-    static __thread bool payload_random;
-    static __thread uint64_t keepalive_request_interval;
 
     static udphdr *decode_hdr_pre(rte_mbuf *data)
     {
