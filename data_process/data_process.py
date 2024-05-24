@@ -164,22 +164,22 @@ F3_core_cps_data = {
 }
 
 arry1 = np.rint(np.array(list(F3_core_cps_data.values())).mean(axis=1))
-arry2 = np.array([2101044, 4000423, 7010743, 10027172, 0])
+arry2 = np.array([2830000, 4050000, 7500000, 10500000, 16000000, 21500000])
 arrx = np.array(list(F3_core_cps_data.keys()))
 
 plt.plot(arrx, arry1, 'o', label='F3', markersize=40, color='blue', linewidth = '4', linestyle='--')
 plt.plot(arrx, arry2, 'o', label='D-perf', markersize=40, color='red', linewidth = '4', linestyle='--')
 
 
-plt.xlim(0, 11)
+plt.xlim(-3, 11)
 plt.xticks(list(range(1,10)),list(range(1,10)),fontsize=40)
 plt.yticks(fontsize=40)
 plt.xlabel('Number of used cores', fontsize=60)
-plt.ylabel('Max throughput of CPS',fontsize=60)
+plt.ylabel('Max throughput of MCPS',fontsize=60)
 
 for i in range(len(arrx)):
-        plt.text(arrx[i]+0.1, arry1[i]-300000, f"({arrx[i]}cores, {int(arry1[i])}cps)", fontsize=40)
-        plt.text(arrx[i]+0.1, arry2[i]+300000, f"({arrx[i]}cores, {int(arry2[i])}cps)", fontsize=40)
+        plt.text(arrx[i]-3.7, arry1[i], f"({arrx[i]}cores, {int(arry1[i])}cps)", fontsize=40)
+        plt.text(arrx[i]+0.1, arry2[i], f"({arrx[i]}cores, {int(arry2[i])}cps)", fontsize=40)
 plt.legend(fontsize=52, shadow=True)
 plt.savefig('./cps_core.png')
 
