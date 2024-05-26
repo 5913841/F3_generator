@@ -9,6 +9,8 @@
 enum protocol_type {
     p_tcp,
     p_udp,
+    p_tcp_syn,
+    p_tcp_ack,
 };
 
 struct global_states {

@@ -53,7 +53,7 @@ endif
 
 CFLAGS += -O3 -g -I./src  -I./src/socket/socket_table/parallel-hashmap
 CFLAGS += -DHTTP_PARSE
-CFLAGS += -DDEBUG_
+# CFLAGS += -DDEBUG_
 CFLAGS += -Wno-address-of-packed-member -Wformat-truncation=0
 CFLAGS += $(shell $(PKGCONF) --cflags libdpdk)
 LDFLAGS += $(shell $(PKGCONF) --libs libdpdk) -lpthread -lrte_net_bond -lrte_bus_pci -lrte_bus_vdev -lrte_pcapng -lrte_pdump -lrte_efd -lpcap -lstdc++

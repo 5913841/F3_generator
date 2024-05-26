@@ -11,7 +11,7 @@
 
 void udp_set_payload(int page_size);
 int udp_launch(Socket *socket);
-struct rte_mbuf *udp_send(Socket *socket);
+void udp_send(Socket *socket);
 char *udp_get_payload();
 
 struct global_udp_vars {
@@ -21,12 +21,12 @@ struct global_udp_vars {
     bool global_stop;
     bool payload_random;
     uint64_t keepalive_request_interval;
+    mbuf_cache *template_udp_pkt;
 };
 
 struct UDP
 {
 public:
-    Socket *socket;
     UniqueTimer timer;
     uint8_t state;
     uint16_t keepalive_request_num : 15;
@@ -58,5 +58,7 @@ public:
         return sizeof(struct udphdr);
     }
 };
+
+
 
 #endif

@@ -104,6 +104,14 @@ int thread_main(void* arg)
                 }
                 socket->tcp.process(socket, m);
             }
+            else if (g_vars[pattern].p_type == p_udp)
+            {
+
+            }
+            else if (g_vars[pattern].p_type == p_tcp_syn || g_vars[pattern].p_type == p_tcp_ack)
+            {
+
+            }
         } while (recv_num < 4);
 
         dpdk_config_percore::cfg_send_flush();
@@ -178,7 +186,31 @@ rerand:
             else if(g_vars[i].p_type == p_udp)
             {
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
-
+                for (int j = 0; j < launch_num; j++)
+                {
+                    primitives::random_methods[i](&template_socket[i]);
+                    udp_send(&template_socket[i]);
+                }
+                
+            }
+            else if (g_vars[i].p_type == p_tcp_syn)
+            {
+                int launch_num = dpdk_config_percore::check_epoch_timer(i);
+                for (int j = 0; j < launch_num; j++)
+                {
+                    primitives::random_methods[i](&template_socket[i]);
+                    tcp_reply(&template_socket[i], TH_SYN);
+                }
+                
+            }
+            else if (g_vars[i].p_type == p_tcp_ack)
+            {
+                int launch_num = dpdk_config_percore::check_epoch_timer(i);
+                for (int j = 0; j < launch_num; j++)
+                {
+                    primitives::random_methods[i](&template_socket[i]);
+                    tcp_reply(&template_socket[i], TH_ACK);
+                }
             }
         }
 continue_epoch:

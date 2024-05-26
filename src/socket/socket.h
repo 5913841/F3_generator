@@ -13,6 +13,7 @@
 #include "common/utils.h"
 #include "protocols/TCP.h"
 #include "protocols/HTTP.h"
+#include "protocols/UDP.h"
 #include "common/addrtype.h"
 
 typedef __uint128_t uint128_t;
@@ -54,8 +55,14 @@ public:
     ip4addr_t src_addr;
     port_t dst_port;
     port_t src_port;
-    TCP tcp;
-    HTTP http;
+    union {
+        struct{
+            TCP tcp;
+            HTTP http;
+        };
+        UDP udp;
+        void* protocol_ptr;
+    };
     uint8_t pattern;
     Socket()
     {
