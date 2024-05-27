@@ -159,13 +159,13 @@ static struct rte_mbuf *tcp_new_packet(struct Socket *sk, uint8_t tcp_flags)
     struct mbuf_cache *p = NULL;
     if (tcp_flags & TH_SYN)
     {
-        p = g_vars[sk->pattern].tcp_vars.template_tcp_opt;
+        p = g_templates[sk->pattern].tcp_templates.template_tcp_opt;
         csum_tcp = tcp->csum_tcp_opt;
         // csum_ip = tcp->csum_ip_opt;
     }
     else if (tcp_flags & TH_PUSH)
     {
-        p = g_vars[sk->pattern].tcp_vars.template_tcp_data;
+        p = g_templates[sk->pattern].tcp_templates.template_tcp_data;
         csum_tcp = tcp->csum_tcp_data;
         // csum_ip = tcp->csum_ip_data;
         snd_seq = p->data.data_len;
@@ -176,7 +176,7 @@ static struct rte_mbuf *tcp_new_packet(struct Socket *sk, uint8_t tcp_flags)
     }
     else
     {
-        p = g_vars[sk->pattern].tcp_vars.template_tcp_pkt;
+        p = g_templates[sk->pattern].tcp_templates.template_tcp_pkt;
         csum_tcp = tcp->csum_tcp;
         // csum_ip = tcp->csum_ip;
     }
@@ -1307,15 +1307,27 @@ void tcp_validate_socket(Socket *socket)
 void tcp_validate_csum(Socket *socket)
 {
     TCP *tcp = &socket->tcp;
-    tcp->csum_tcp = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), g_vars[socket->pattern].tcp_vars.template_tcp_pkt->data.l4_len + g_vars[socket->pattern].tcp_vars.template_tcp_pkt->data.data_len);
-    tcp->csum_tcp_data = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), g_vars[socket->pattern].tcp_vars.template_tcp_data->data.l4_len + g_vars[socket->pattern].tcp_vars.template_tcp_data->data.data_len);
-    tcp->csum_tcp_opt = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), g_vars[socket->pattern].tcp_vars.template_tcp_opt->data.l4_len + g_vars[socket->pattern].tcp_vars.template_tcp_opt->data.data_len);
+    tcp->csum_tcp = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), g_templates[socket->pattern].tcp_templates.template_tcp_pkt->data.l4_len + g_templates[socket->pattern].tcp_templates.template_tcp_pkt->data.data_len);
+    tcp->csum_tcp_data = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), g_templates[socket->pattern].tcp_templates.template_tcp_data->data.l4_len + g_templates[socket->pattern].tcp_templates.template_tcp_data->data.data_len);
+    tcp->csum_tcp_opt = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), g_templates[socket->pattern].tcp_templates.template_tcp_opt->data.l4_len + g_templates[socket->pattern].tcp_templates.template_tcp_opt->data.data_len);
 }
 
 void tcp_validate_csum_opt(Socket *socket)
 {
     TCP *tcp = &socket->tcp;
-    tcp->csum_tcp_opt = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), g_vars[socket->pattern].tcp_vars.template_tcp_opt->data.l4_len + g_vars[socket->pattern].tcp_vars.template_tcp_opt->data.data_len);
+    tcp->csum_tcp_opt = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), g_templates[socket->pattern].tcp_templates.template_tcp_opt->data.l4_len + g_templates[socket->pattern].tcp_templates.template_tcp_opt->data.data_len);
+}
+
+void tcp_validate_csum_pkt(Socket *socket)
+{
+    TCP *tcp = &socket->tcp;
+    tcp->csum_tcp = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), g_templates[socket->pattern].tcp_templates.template_tcp_pkt->data.l4_len + g_templates[socket->pattern].tcp_templates.template_tcp_pkt->data.data_len);
+}
+
+void tcp_validate_csum_data(Socket *socket)
+{
+    TCP *tcp = &socket->tcp;
+    tcp->csum_tcp_data = csum_pseudo_ipv4(IPPROTO_TCP, ntohl(socket->src_addr), ntohl(socket->dst_addr), g_templates[socket->pattern].tcp_templates.template_tcp_data->data.l4_len + g_templates[socket->pattern].tcp_templates.template_tcp_data->data.data_len);
 }
 
 void tcp_launch(Socket *socket)

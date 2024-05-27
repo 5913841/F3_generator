@@ -132,6 +132,7 @@ int dpdk_init(struct dpdk_config *cfg, char *argv0)
 
     if(cfg->num_lcores == 1){
         g_config_percore = new dpdk_config_percore(cfg);
+        g_config_percore_all[0] = g_config_percore;
         net_stats_init();
     }
     if(cfg->use_rss) rss_init();
@@ -159,6 +160,7 @@ int dpdk_run_thread(void* thd)
 {
     dpdk_lcore_thread* thread = (dpdk_lcore_thread*)thd;
     g_config_percore = new dpdk_config_percore(g_config);
+    g_config_percore_all[g_config_percore->lcore_id] = g_config_percore;
     net_stats_init();
     return thread->lcore_main(thread->data);
 }
@@ -178,6 +180,7 @@ void dpdk_run(int (*lcore_main)(void*), void* data)
     }
     
     g_config_percore = new dpdk_config_percore(g_config);
+    g_config_percore_all[g_config_percore->lcore_id] = g_config_percore;
     net_stats_init();
     lcore_main(data);
     rte_eal_mp_wait_lcore();

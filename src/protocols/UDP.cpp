@@ -13,7 +13,17 @@ const int timer_offset = offsetof(UDP, timer) + offsetof(Socket, udp);
 
 void udp_start_keepalive_timer(struct Socket *sk, uint64_t now_tsc);
 
-static __thread char g_udp_data[MBUF_DATA_SIZE] = "hello THUGEN!!\n";
+
+int UDP::construct(Socket *socket, rte_mbuf *data)
+{
+    udphdr *udp = decode_hdr_pre(data);
+    udp->len = htons(sizeof(struct udphdr) + strlen(udp_get_payload(socket->pattern)));
+    data->l4_len = sizeof(struct udphdr);
+    rte_pktmbuf_prepend(data, sizeof(struct udphdr));
+    return sizeof(struct udphdr);
+}
+
+static __thread char g_udp_data[MAX_PATTERNS][MBUF_DATA_SIZE] = {"hello THUGEN!!\n", "hello THUGEN!!\n", "hello THUGEN!!\n", "hello THUGEN!!\n"};
 void udp_set_payload(char *data, int len, int new_line, int pattern_id)
 {
     int i = 0;
@@ -50,7 +60,7 @@ void udp_set_payload(char *data, int len, int new_line, int pattern_id)
 
 void udp_set_payload(int page_size, int pattern_id)
 {
-    udp_set_payload(g_udp_data, page_size, 1, pattern_id);
+    udp_set_payload(g_udp_data[pattern_id], page_size, 1, pattern_id);
 }
 
 static inline struct rte_mbuf *udp_new_packet(struct Socket *sk)
@@ -62,7 +72,7 @@ static inline struct rte_mbuf *udp_new_packet(struct Socket *sk)
 
     UDP *udp = &sk->udp;
 
-    mbuf_cache *p = g_vars[sk->pattern].udp_vars.template_udp_pkt;
+    mbuf_cache *p = g_templates[sk->pattern].udp_templates.template_udp_pkt;
 
     m = mbuf_cache_alloc(p);
     if (unlikely(m == NULL))
@@ -85,7 +95,7 @@ static inline struct rte_mbuf *udp_new_packet(struct Socket *sk)
 
     uh->source = htons(sk->src_port);
     uh->dest = htons(sk->dst_port);
-    uh->check = csum_pseudo_ipv4(IPPROTO_UDP, sk->src_addr, sk->dst_addr, p->data.l4_len);
+    uh->check = sk->udp.csum_udp;
 
     return m;
 }
@@ -258,9 +268,9 @@ int udp_launch(Socket *sk)
     return num;
 }
 
-char *udp_get_payload()
+char *udp_get_payload(int pattern_id)
 {
-    return g_udp_data;
+    return g_udp_data[pattern_id];
 }
 
 void udp_drop(__rte_unused struct work_space *ws, struct rte_mbuf *m)
@@ -270,4 +280,10 @@ void udp_drop(__rte_unused struct work_space *ws, struct rte_mbuf *m)
         net_stats_udp_drop();
         mbuf_free2(m);
     }
+}
+
+void udp_validate_csum(Socket *socket)
+{
+    UDP *udp = &socket->udp;
+    udp->csum_udp = csum_pseudo_ipv4(IPPROTO_UDP, socket->src_addr, socket->dst_addr, g_templates[socket->pattern].udp_templates.template_udp_pkt->data.l4_len);
 }

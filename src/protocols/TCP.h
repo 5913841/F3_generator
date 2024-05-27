@@ -31,9 +31,6 @@ struct global_tcp_vars
     bool flood;
     bool server;
     uint8_t send_window;
-    mbuf_cache *template_tcp_data;
-    mbuf_cache *template_tcp_opt;
-    mbuf_cache *template_tcp_pkt;
     bool global_keepalive;
     bool global_stop;
     /* tsc */
@@ -52,6 +49,12 @@ struct global_tcp_vars
     bool constructing_opt_tmeplate;
     SocketPointerTable* socket_table;
     bool preset;
+};
+
+struct global_tcp_templates{
+    mbuf_cache *template_tcp_data;
+    mbuf_cache *template_tcp_opt;
+    mbuf_cache *template_tcp_pkt;
 };
 
 class TCP
@@ -114,4 +117,7 @@ void tcp_validate_csum(Socket* scoket);
 
 void tcp_validate_csum_opt(Socket* scoket);
 
+void tcp_validate_csum_pkt(Socket *socket);
+
+void tcp_validate_csum_data(Socket *socket);
 #endif

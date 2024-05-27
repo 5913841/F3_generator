@@ -16,6 +16,7 @@ struct dpdk_config;
 struct dpdk_config_percore;
 
 extern __thread dpdk_config_percore *g_config_percore;
+extern dpdk_config_percore* g_config_percore_all[MAX_LCORES];
 extern dpdk_config *g_config;
 
 struct dpdk_config
@@ -56,6 +57,7 @@ struct dpdk_config_percore
     int epoch_work;
     uint64_t epoch_last_tsc;
 
+    bool start;
     uint8_t lcore_id;
     uint8_t port_id;
     uint8_t queue_id;
@@ -99,10 +101,12 @@ public:
         if (unlikely(tsc_time_go(&g_config_percore->time.second, time_in_config())))
         {
             net_stats_timer_handler();
+#ifdef DISABLE_CTL_THREAD
             if(g_config_percore->lcore_id == 0)
             {
                 net_stats_print_speed(0, g_config_percore->time.second.count);
             }
+#endif
 #ifdef CLEAR_NIC
             if(unlikely(g_config->use_clear_nic_queue && (g_config_percore->clear_nic_queue_next <= time_in_config()) && (g_eth_stats.ierrors > 1000000))){
                 rte_eth_dev_rx_queue_stop(g_config_percore->port_id, g_config_percore->queue_id);

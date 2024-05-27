@@ -1,6 +1,7 @@
 #include "common/primitives.h"
 #include <vector>
 #include "protocols/global_states.h"
+#include "common/ctl.h"
 
 dpdk_config * primitives::dpdk_config_pri;
 
@@ -52,7 +53,8 @@ int thread_main(void* arg)
         {
             continue;
         }
-        if(g_vars[socket.pattern].p_type == p_tcp){
+        if(g_vars[socket.pattern].p_type == p_tcp)
+        {
             if(g_vars[socket.pattern].tcp_vars.server)
             {
                 Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
@@ -72,13 +74,44 @@ int thread_main(void* arg)
                 delete ths_socket;
             }
         }
+        else if(g_vars[socket.pattern].p_type == p_udp)
+        {
+            Socket* ths_socket = new Socket(template_socket[socket.pattern]);
+            memcpy(ths_socket, &socket, sizeof(FiveTuples));
+            ths_socket->protocol = IPPROTO_UDP;
+            udp_validate_csum(ths_socket);
+            primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
+            primitives::socketsize_partby_pattern[socket.pattern]++;
+            delete ths_socket;
+        }
+        else if(g_vars[socket.pattern].p_type == p_tcp_syn)
+        {
+            Socket* ths_socket = new Socket(template_socket[socket.pattern]);
+            memcpy(ths_socket, &socket, sizeof(FiveTuples));
+            ths_socket->protocol = IPPROTO_TCP;
+            tcp_validate_csum_opt(ths_socket);
+            primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
+            primitives::socketsize_partby_pattern[socket.pattern]++;
+            delete ths_socket;
+        }
+        else if(g_vars[socket.pattern].p_type == p_tcp_ack)
+        {
+            Socket* ths_socket = new Socket(template_socket[socket.pattern]);
+            memcpy(ths_socket, &socket, sizeof(FiveTuples));
+            ths_socket->protocol = IPPROTO_TCP;
+            tcp_validate_csum_pkt(ths_socket);
+            primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
+            primitives::socketsize_partby_pattern[socket.pattern]++;
+            delete ths_socket;
+        }
     }
 
     primitives::sockets_ready_to_add.resize(0);
 
     memset(primitives::socketpointer_partby_pattern, 0, sizeof(primitives::socketpointer_partby_pattern));
 
-    while (true)
+    g_config_percore->start = true;
+    while (g_config_percore->start)
     {
         dpdk_config_percore::enter_epoch();
         int recv_num = 0;
@@ -186,30 +219,80 @@ rerand:
             else if(g_vars[i].p_type == p_udp)
             {
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
-                for (int j = 0; j < launch_num; j++)
+                if(g_vars[i].udp_vars.preset)
                 {
-                    primitives::random_methods[i](&template_socket[i]);
-                    udp_send(&template_socket[i]);
+                    for (int j = 0; j < launch_num; j++)
+                    {
+                        Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
+                        primitives::socketpointer_partby_pattern[i]++;
+                        if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
+                        {
+                            primitives::socketpointer_partby_pattern[i] = 0;
+                        }
+                        udp_send(socket);
+                    }
+                }
+                else
+                {
+                    for (int j = 0; j < launch_num; j++)
+                    {
+                        primitives::random_methods[i](&template_socket[i]);
+                        udp_validate_csum(&template_socket[i]);
+                        udp_send(&template_socket[i]);
+                    }
                 }
                 
             }
             else if (g_vars[i].p_type == p_tcp_syn)
             {
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
-                for (int j = 0; j < launch_num; j++)
+                if(g_vars[i].tcp_vars.preset)
                 {
-                    primitives::random_methods[i](&template_socket[i]);
-                    tcp_reply(&template_socket[i], TH_SYN);
+                    for (int j = 0; j < launch_num; j++)
+                    {
+                        Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
+                        primitives::socketpointer_partby_pattern[i]++;
+                        if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
+                        {
+                            primitives::socketpointer_partby_pattern[i] = 0;
+                        }
+                        tcp_reply(socket, TH_SYN);
+                    }
                 }
-                
+                else
+                {
+                    for (int j = 0; j < launch_num; j++)
+                    {
+                        primitives::random_methods[i](&template_socket[i]);
+                        tcp_validate_csum_opt(&template_socket[i]);
+                        tcp_reply(&template_socket[i], TH_SYN);
+                    }
+                }
             }
             else if (g_vars[i].p_type == p_tcp_ack)
             {
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
-                for (int j = 0; j < launch_num; j++)
+                if(g_vars[i].tcp_vars.preset)
                 {
-                    primitives::random_methods[i](&template_socket[i]);
-                    tcp_reply(&template_socket[i], TH_ACK);
+                    for (int j = 0; j < launch_num; j++)
+                    {
+                        Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
+                        primitives::socketpointer_partby_pattern[i]++;
+                        if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
+                        {
+                            primitives::socketpointer_partby_pattern[i] = 0;
+                        }
+                        tcp_reply(socket, TH_ACK);
+                    }
+                }
+                else
+                {
+                    for (int j = 0; j < launch_num; j++)
+                    {
+                        primitives::random_methods[i](&template_socket[i]);
+                        tcp_validate_csum_pkt(&template_socket[i]);
+                        tcp_reply(&template_socket[i], TH_ACK);
+                    }
                 }
             }
         }
@@ -270,6 +353,10 @@ void primitives::set_total_time(std::string total_time)
 
 void primitives::run_generate()
 {
+    pthread_t thread;
+
+    ctl_thread_start(g_config, &thread);
+
     if(g_config->num_lcores == 1)
     {
         thread_main(nullptr);
@@ -278,4 +365,6 @@ void primitives::run_generate()
     {
         dpdk_run(thread_main, NULL);
     }
+
+    ctl_thread_wait(thread);
 }

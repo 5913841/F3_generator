@@ -3,6 +3,7 @@
 #include "timer/clock.h"
 
 __thread dpdk_config_percore *g_config_percore;
+dpdk_config_percore* g_config_percore_all[MAX_LCORES];
 dpdk_config *g_config;
 
 dpdk_config::dpdk_config(dpdk_config_user *user_config) 

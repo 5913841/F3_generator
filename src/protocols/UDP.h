@@ -9,10 +9,11 @@
 #include "dpdk/mbuf_template.h"
 #include "timer/unique_timer.h"
 
-void udp_set_payload(int page_size);
+void udp_set_payload(int page_size, int pattern_id);
 int udp_launch(Socket *socket);
 void udp_send(Socket *socket);
-char *udp_get_payload();
+char *udp_get_payload(int pattern_id);
+void udp_validate_csum(Socket *socket);
 
 struct global_udp_vars {
     uint8_t pipeline;
@@ -20,7 +21,12 @@ struct global_udp_vars {
     int global_duration_time;
     bool global_stop;
     bool payload_random;
+    bool preset;
     uint64_t keepalive_request_interval;
+};
+
+struct global_udp_templates
+{
     mbuf_cache *template_udp_pkt;
 };
 
@@ -31,7 +37,7 @@ public:
     uint8_t state;
     uint16_t keepalive_request_num : 15;
     uint16_t keepalive : 1;
-    uint64_t timer_tsc;
+    uint16_t csum_udp;
 
     static udphdr *decode_hdr_pre(rte_mbuf *data)
     {
@@ -49,14 +55,7 @@ public:
         return 0;
     }
 
-    int construct(Socket *socket, rte_mbuf *data)
-    {
-        udphdr *udp = decode_hdr_pre(data);
-        udp->len = htons(sizeof(struct udphdr) + strlen(udp_get_payload()));
-        data->l4_len = sizeof(struct udphdr);
-        rte_pktmbuf_prepend(data, sizeof(struct udphdr));
-        return sizeof(struct udphdr);
-    }
+    int construct(Socket *socket, rte_mbuf *data);
 };
 
 
