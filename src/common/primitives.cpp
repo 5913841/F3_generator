@@ -182,7 +182,7 @@ repick:
 
                             if (TCP::socket_table->insert_socket(socket) == -1)
                             {
-                                if(unlikely(fail_cnt >= 5))
+                                if(unlikely(fail_cnt >= RERAND_MAX_NUM))
                                 {
                                     goto continue_epoch;
                                 }
@@ -203,7 +203,7 @@ rerand:
 
                             if (!rss_check_socket(socket) || TCP::socket_table->insert_socket(socket) == -1)
                             {
-                                if(unlikely(fail_cnt >= 5))
+                                if(unlikely(fail_cnt >= RERAND_MAX_NUM))
                                 {
                                     goto continue_epoch;
                                 }

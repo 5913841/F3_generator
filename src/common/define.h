@@ -134,5 +134,6 @@
 
 #define MAX_SOCKETS_RANGE_PER_PATTERN (1000000)
 
+#define RERAND_MAX_NUM 3
 
 #endif
