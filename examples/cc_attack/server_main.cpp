@@ -12,8 +12,8 @@ using namespace primitives;
 
 dpdk_config_user usrconfig = {
     .lcores = {0},
-    .ports = {"0000:01:00.1"},
-    .gateway_for_ports = {"90:e2:ba:87:62:98"},
+    .ports = {"0000:01:00.0"},
+    .gateway_for_ports = {"90:e2:ba:8a:c7:a1"},
     .queue_num_per_port = {1},
     .always_accurate_time = false,
     .tx_burst_size = 64,
@@ -22,12 +22,12 @@ dpdk_config_user usrconfig = {
 
 protocol_config p_config = {
     .protocol = "TCP",
-    .mode = "client",
+    .mode = "server",
     .preset = false,
     .use_http = true,
     .use_keepalive = true,
-    .keepalive_interval = "1s",
-    .keepalive_request_maxnum = "10",
+    .keepalive_interval = "2s",
+    .keepalive_request_maxnum = "5",
     .launch_batch = "1",
     .cps = "0.5M",
     .cc = "5M",
