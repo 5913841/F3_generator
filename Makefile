@@ -4,6 +4,7 @@ EXAMPLES := examples/trail/client_cps_core_2c.cpp examples/trail/server_cps_core
 			examples/trail/client_mix_cps_cpu.cpp examples/trail/server_mix_cps_cpu.cpp \
 			examples/trail/client_range_mem.cpp\
 			examples/trail/udp.cpp \
+            examples/cc_attack/client_main.cpp examples/cc_attack/server_main.cpp \
   			# examples/http_flood_primitive/client_multithread.cpp examples/http_flood_primitive/server_multithread.cpp \
 			# examples/http_flood_primitive/client_mix.cpp examples/http_flood_primitive/server_mix.cpp \
 			# examples/http_flood_primitive/server_nothttp.cpp examples/http_flood_primitive/client_nothttp.cpp \
@@ -16,7 +17,6 @@ EXAMPLES := examples/trail/client_cps_core_2c.cpp examples/trail/server_cps_core
 			# examples/tcp_syn_flood/multithread.cpp \
         	# examples/scanning/tcp_syn_flood.cpp \
             # examples/udp_flood/main.cpp \
-            # examples/cc_attack/client_main.cpp examples/cc_attack/server_main.cpp
 # EXAMPLES := examples/tcp_syn_flood/multithread.cpp
 
 SRCS-y := src/timer/*.cpp src/common/*.cpp src/dpdk/*.cpp src/multi_thread/*.cpp src/protocols/*.cpp src/socket/*.cpp src/panel/*.cpp src/socket/socket_table/*.cpp  src/socket/socket_vector/*.cpp src/dpdk/divert/*.cpp \
@@ -55,7 +55,7 @@ endif
 CFLAGS += -O3 -g -I./src  -I./src/socket/socket_table/parallel-hashmap
 CFLAGS += -DHTTP_PARSE
 # CFLAGS += -DDEBUG_
-CFLAGS += -DUSE_CTL_THREAD
+# CFLAGS += -DUSE_CTL_THREAD
 CFLAGS += -Wno-address-of-packed-member -Wformat-truncation=0
 CFLAGS += $(shell $(PKGCONF) --cflags libdpdk)
 LDFLAGS += $(shell $(PKGCONF) --libs libdpdk) -lpthread -lrte_net_bond -lrte_bus_pci -lrte_bus_vdev -lrte_pcapng -lrte_pdump -lrte_efd -lpcap -lstdc++
