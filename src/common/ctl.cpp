@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #include "common/ctl.h"
 #include "panel/panel.h"
