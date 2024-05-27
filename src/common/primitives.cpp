@@ -353,9 +353,11 @@ void primitives::set_total_time(std::string total_time)
 
 void primitives::run_generate()
 {
+#ifdef USE_CTL_THREAD
     pthread_t thread;
 
     ctl_thread_start(g_config, &thread);
+#endif
 
     if(g_config->num_lcores == 1)
     {
@@ -366,5 +368,7 @@ void primitives::run_generate()
         dpdk_run(thread_main, NULL);
     }
 
+#ifdef USE_CTL_THREAD
     ctl_thread_wait(thread);
+#endif
 }

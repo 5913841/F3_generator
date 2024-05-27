@@ -114,6 +114,11 @@ uint64_t config_parse_time(const char *str)
 void config_protocols(int pattern, protocol_config *protocol_cfg)
 {
     ether->port = g_config_percore->port;
+#ifdef USE_CTL_THREAD
+    g_vars[pattern].slow_start = atoi(protocol_cfg->slow_start.data());
+    g_vars[pattern].launch_num = atoi(protocol_cfg->launch_batch.data());
+    g_vars[pattern].cps = config_parse_number(protocol_cfg->cps.c_str(), true, true);
+#endif
     if(protocol_cfg->protocol == "TCP"){
         g_vars[pattern].p_type = p_tcp;
         g_vars[pattern].tcp_vars.flood = protocol_cfg->just_send_first_packet;

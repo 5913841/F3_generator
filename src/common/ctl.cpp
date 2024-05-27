@@ -43,7 +43,7 @@ static void ctl_slow_start(FILE *fp, int *seconds)
             if(pattern >= g_pattern_num) break;
             int launch_num = g_vars[pattern].launch_num;
             int slow_start = g_vars[pattern].slow_start;
-            if (i > slow_start)
+            if (i > slow_start || slow_start == 0)
             {
                 continue;
             }
@@ -52,6 +52,7 @@ static void ctl_slow_start(FILE *fp, int *seconds)
                 step = 1;
             }
             cps = step * i;
+            if(cps == 0) continue;
             launch_interval = (g_tsc_per_second * launch_num) / cps;
             #pragma unroll
             for(int j = 0; j < MAX_LCORES; j++){
@@ -115,7 +116,6 @@ static void *ctl_thread_main(void *data)
     wait_start();
 
     ctl_wait_init();
-
     ctl_slow_start(fp, &seconds);
 
     for (i = 0; i < count; i++) {

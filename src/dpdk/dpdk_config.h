@@ -101,7 +101,7 @@ public:
         if (unlikely(tsc_time_go(&g_config_percore->time.second, time_in_config())))
         {
             net_stats_timer_handler();
-#ifdef DISABLE_CTL_THREAD
+#ifndef USE_CTL_THREAD
             if(g_config_percore->lcore_id == 0)
             {
                 net_stats_print_speed(0, g_config_percore->time.second.count);
