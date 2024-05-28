@@ -28,11 +28,11 @@ protocol_config p_config = {
     .preset = false,
     .use_http = false,
     .use_keepalive = true,
-    .keepalive_interval = "60s",
-    .keepalive_request_maxnum = "0",
+    .keepalive_interval = "30s",
+    .keepalive_request_maxnum = "1",
     .launch_batch = "10",
-    .cps = "0.2M",
-    .cc = "5M",
+    .cps = "0.3M",
+    .cc = "7M",
     .template_ip_src = "10.233.1.2",
     .template_ip_dst = "10.233.1.3"
 };
