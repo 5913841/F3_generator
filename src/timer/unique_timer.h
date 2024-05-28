@@ -31,8 +31,14 @@ inline void unique_queue_init(struct UniqueTimerQueue *queue)
 
 inline void unique_queue_del(struct UniqueTimer* timer)
 {
-    timer->next->prev = timer->prev;
-    timer->prev->next = timer->next;
+    struct UniqueTimer *prev = timer->prev;
+    struct UniqueTimer *next = timer->next;
+
+    if (timer != next) {
+        prev->next = next;
+        next->prev = prev;
+        unique_timer_init(timer);
+    }
 }
 
 inline void unique_queue_push(struct UniqueTimerQueue *queue, struct UniqueTimer* timer)
