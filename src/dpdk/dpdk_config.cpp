@@ -1,6 +1,7 @@
 #include "dpdk/dpdk_config.h"
 #include "panel/panel.h"
 #include "timer/clock.h"
+#include "protocols/conf_protocol.h"
 
 __thread dpdk_config_percore *g_config_percore;
 dpdk_config_percore* g_config_percore_all[MAX_LCORES];
@@ -17,12 +18,24 @@ dpdk_config::dpdk_config(dpdk_config_user *user_config)
     always_accurate_time = user_config->always_accurate_time;
     tx_burst_size = user_config->tx_burst_size;
     rx_burst_size = user_config->rx_burst_size;
-    if (user_config->flow_distribution_strategy == "rss")
+
+    use_preset_flowtable_size = user_config->use_preset_flowtable_size;
+
+    if(!use_preset_flowtable_size)
+    {
+        flowtable_init_size = 100000;
+    }
+    else
+    {
+        flowtable_init_size = config_parse_number(user_config->flowtable_init_size.c_str(), true, true);
+    }
+
+    if (user_config->flow_distribution_strategy == "rss" && num_lcores > 1)
     {
         use_rss = true;
         use_fdir = false;
     }
-    else if (user_config->flow_distribution_strategy == "fdir")
+    else if (user_config->flow_distribution_strategy == "fdir" && num_lcores > 1)
     {
         use_rss = false;
         use_fdir = true;

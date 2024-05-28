@@ -70,6 +70,13 @@ bool tcp_state_after_established(uint8_t state)
            state == TCP_TIME_WAIT;
 }
 
+void TCP::tcp_init(int pattern)
+{
+    srand_(rte_rdtsc());
+    timer_init(pattern);
+    socket_table->socket_table.reserve(g_config->flowtable_init_size);
+}
+
 int TCP::construct(Socket *socket, rte_mbuf *data)
 {
     int opt_len = 0;

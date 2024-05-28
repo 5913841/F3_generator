@@ -48,6 +48,8 @@ struct dpdk_config
     int tx_burst_size;
     int rx_burst_size;
     const bool use_clear_nic_queue = false;
+    uint32_t flowtable_init_size;
+    bool use_preset_flowtable_size;
     dpdk_config(dpdk_config_user *user_config);
 };
 

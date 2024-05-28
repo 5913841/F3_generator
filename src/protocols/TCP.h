@@ -95,11 +95,7 @@ public:
 
     static void timer_init(int pattern);
 
-    static void tcp_init(int pattern)
-    {
-        srand_(rte_rdtsc());
-        timer_init(pattern);
-    }
+    static void tcp_init(int pattern);
 };
 
 void tcp_reply(struct Socket *sk, uint8_t tcp_flags);

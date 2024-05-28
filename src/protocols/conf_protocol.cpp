@@ -199,6 +199,18 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
         template_tcp_opt[pattern].mbuf_pool = mbuf_pool_create(g_config, (std::string("template_tcp_opt") + "_" + std::to_string(g_config_percore->lcore_id) + "_" + (std::to_string(pattern))).c_str(), g_config_percore->port_id, g_config_percore->queue_id);
         mbuf_template_pool_setby_constructors(template_tcp_opt + pattern, template_socket + pattern, constructors, nullptr, 0);
 
+        if(!g_config->use_preset_flowtable_size)
+        {
+            if(cc > 0)
+            {
+                g_config->flowtable_init_size += cc * 2;
+            }
+            else
+            {
+                g_config->flowtable_init_size += (((uint128_t) g_vars[pattern].tcp_vars.keepalive_request_interval * (uint128_t) g_vars[pattern].tcp_vars.setted_keepalive_request_num)) * (uint128_t) cps / g_tsc_per_second * 2;
+            }
+        }
+
         TCP::tcp_init(pattern);
     }
     else if(protocol_cfg->protocol == "UDP")
