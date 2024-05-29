@@ -203,11 +203,11 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
         {
             if(cc > 0)
             {
-                g_config->flowtable_init_size += cc * 2;
+                g_config->flowtable_init_size += cc / g_config->num_lcores * 2;
             }
             else
             {
-                g_config->flowtable_init_size += (((uint128_t) g_vars[pattern].tcp_vars.keepalive_request_interval * (uint128_t) g_vars[pattern].tcp_vars.setted_keepalive_request_num)) * (uint128_t) cps / g_tsc_per_second * 2;
+                g_config->flowtable_init_size += (((uint128_t) g_vars[pattern].tcp_vars.keepalive_request_interval * (uint128_t) g_vars[pattern].tcp_vars.setted_keepalive_request_num)) * (uint128_t) (cps / g_config->num_lcores) / g_tsc_per_second * 2;
             }
         }
 
