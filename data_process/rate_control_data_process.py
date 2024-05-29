@@ -25,7 +25,12 @@ for line in data:
         skopen = skopen.replace(",", "")
         skopen = int(skopen)
         if (state == "process1") and (skopen != 0):
-            state = "not_process2"
+            second += 1
+            if(second >= 4):
+                state = "not_process2"
+                second = 0
+            else:
+                state = "not_process1"
         elif (state == "process2") and (skopen != 0):
             datas.append(skopen)
             second += 1
