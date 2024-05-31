@@ -162,18 +162,27 @@ static int net_stats_print_socket(struct net_stats *stats, char *buf, int buf_le
     int len = buf_len;
     uint64_t sk_open = 0;
     uint64_t sk_close = 0;
+    uint64_t sk_dup = 0;
+    uint64_t sk_curr = 0;
+    uint64_t sk_err = 0;
 
-    sk_open = stats->socket_open - stats->socket_dup;
-    sk_close = stats->socket_close;
-    if (sk_close >= stats->socket_dup)
+    #pragma unroll
+    for(int i = 0; i < MAX_PATTERNS; i++){
+        sk_open += stats->socket_open[i] - stats->socket_dup[i];
+        sk_close += stats->socket_close[i];
+        sk_dup += stats->socket_dup[i];
+        sk_curr += stats->socket_current[i];
+        sk_err += stats->socket_error[i];
+    }
+    if (sk_close >= sk_dup)
     {
-        sk_close -= stats->socket_dup;
+        sk_close -= sk_dup;
     }
 
     net_stats_format_print(sk_open, open, STATS_BUF_LEN);
     net_stats_format_print(sk_close, close, STATS_BUF_LEN);
-    net_stats_format_print_err(stats->socket_error, error, STATS_BUF_LEN);
-    net_stats_format_print(stats->socket_current, curr, STATS_BUF_LEN);
+    net_stats_format_print_err(sk_err, error, STATS_BUF_LEN);
+    net_stats_format_print(sk_curr, curr, STATS_BUF_LEN);
 
 
     net_stats_print_rtt(stats, rtt, STATS_BUF_LEN);
@@ -466,7 +475,11 @@ static void net_stats_clear_mutable(struct net_stats *s)
 {
     /* don't clear rtt */
     s->cpusage = 0;
-    s->socket_current = 0;
+    #pragma unroll
+    for (int i = 0; i < MAX_PATTERNS; i++)
+    {
+        s->socket_current[i] = 0;
+    }
 }
 
 static void net_stats_sum(struct net_stats *result)

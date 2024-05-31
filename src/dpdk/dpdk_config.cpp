@@ -173,7 +173,7 @@ dpdk_config_percore::dpdk_config_percore(dpdk_config *config)
 //         }
 //     }
 
-//     int launch_num = get_launch_num(g_config_percore->launch_ctls[pattern]);
+//     int launch_num = get_launch_num(g_config_percore->launch_ctls[pattern], pattern);
 //     g_config_percore->epoch_work += launch_num;
 
 //     return launch_num;

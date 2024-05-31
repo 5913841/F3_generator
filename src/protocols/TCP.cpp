@@ -253,7 +253,7 @@ static inline void tcp_socket_close(struct Socket *sk)
     tcp->state = TCP_CLOSE;
     /* don't clear sequences in TIME-WAIT */
     tcp_unvalid_close(sk);
-    net_stats_socket_close();
+    net_stats_socket_close(sk->pattern);
 #ifdef DEBUG_
     printf("Thread: %d, tcp_close_socket: %p\n", g_config_percore->lcore_id, sk);
 #endif
@@ -373,7 +373,7 @@ static inline void tcp_do_timeout(struct Socket *sk)
     printf("Thread: %d, tcp_do_timeout: %p\n", g_config_percore->lcore_id, sk);
 #endif
     TCP *tcp = &sk->tcp;
-    net_stats_socket_error();
+    net_stats_socket_error(sk->pattern);
     tcp_socket_close(sk);
     return;
 }
@@ -458,7 +458,7 @@ static inline void tcp_do_retransmit(struct Socket *sk)
     else
     {
         // SOCKET_LOG(sk, "err-socket");
-        net_stats_socket_error();
+        net_stats_socket_error(sk->pattern);
         tcp_socket_close(sk);
         return;
     }
@@ -866,7 +866,7 @@ static void tcp_server_process_syn(struct Socket *sk, struct rte_mbuf *m, struct
     {
         // tcp->create_socket_callback(sk);
         tcp_socket_create(sk);
-        net_stats_socket_open();
+        net_stats_socket_open(sk->pattern);
         tcp->state = TCP_SYN_RECV;
         tcp->retrans = 0;
         tcp->keepalive_request_num = 0;
@@ -1343,7 +1343,7 @@ void tcp_launch(Socket *socket)
     tcp_validate_socket(socket);
     tcp->state = TCP_SYN_SENT;
     tcp_reply(socket, TH_SYN);
-    net_stats_socket_open();
+    net_stats_socket_open(socket->pattern);
 #ifdef DEBUG_
     printf("Thread: %d, tcp_launch_socket: %p\n", g_config_percore->lcore_id, socket);
 #endif

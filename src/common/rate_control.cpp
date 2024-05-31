@@ -1,7 +1,7 @@
 #include "common/rate_control.h"
 #include "dpdk/dpdk_config.h"
 
-uint64_t get_launch_num(launch_control* lc)
+uint64_t get_launch_num(launch_control* lc, int pattern)
 {
     uint64_t launch_num = lc->launch_num;
     uint64_t num = launch_num;
@@ -11,8 +11,8 @@ uint64_t get_launch_num(launch_control* lc)
     if (lc->launch_next <= time_in_config()) {
         lc->launch_next += lc->launch_interval;
         if (cc > 0) {
-            if (g_net_stats.socket_current < cc) {
-                gap = cc - g_net_stats.socket_current;
+            if (g_net_stats.socket_current[pattern] < cc) {
+                gap = cc - g_net_stats.socket_current[pattern];
                 if (gap < launch_num) {
                     num = gap;
                 }

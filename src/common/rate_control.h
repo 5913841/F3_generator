@@ -11,7 +11,7 @@ struct launch_control {
     uint32_t launch_num;
 };
 
-uint64_t get_launch_num(launch_control* lc);
+uint64_t get_launch_num(launch_control* lc, int pattern);
 
 uint64_t client_assign_task(uint64_t target);
 

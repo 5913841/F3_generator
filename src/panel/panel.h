@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <rte_ethdev.h>
+#include "common/define.h"
 
 /*
  * Each thread calculates CPU usage every second.
@@ -46,10 +47,10 @@ struct net_stats
     uint64_t tos_rx;
 
     /* socket */
-    uint64_t socket_dup;
-    uint64_t socket_open;
-    uint64_t socket_close;
-    uint64_t socket_error;
+    uint64_t socket_dup[MAX_PATTERNS];
+    uint64_t socket_open[MAX_PATTERNS];
+    uint64_t socket_close[MAX_PATTERNS];
+    uint64_t socket_error[MAX_PATTERNS];
 
     /* tcp */
     uint64_t tcp_rx;
@@ -105,7 +106,7 @@ struct net_stats
     uint64_t rtt_num;
 
     uint64_t cpusage;
-    uint64_t socket_current;
+    uint64_t socket_current[MAX_PATTERNS];
 };
 
 void net_stats_init();
@@ -115,29 +116,29 @@ void net_stats_print_speed(FILE *fp, int seconds);
 extern __thread struct net_stats g_net_stats;
 extern rte_eth_stats g_eth_stats;
 
-#define net_stats_socket_dup()        \
+#define net_stats_socket_dup(pattern)        \
     do                                \
     {                                 \
-        g_net_stats.socket_dup++;     \
-        g_net_stats.socket_open++;    \
-        g_net_stats.socket_current++; \
+        g_net_stats.socket_dup[pattern]++;     \
+        g_net_stats.socket_open[pattern]++;    \
+        g_net_stats.socket_current[pattern]++; \
     } while (0)
-#define net_stats_socket_error()    \
+#define net_stats_socket_error(pattern)    \
     do                              \
     {                               \
-        g_net_stats.socket_error++; \
+        g_net_stats.socket_error[pattern]++; \
     } while (0)
-#define net_stats_socket_open()       \
+#define net_stats_socket_open(pattern)       \
     do                                \
     {                                 \
-        g_net_stats.socket_open++;    \
-        g_net_stats.socket_current++; \
+        g_net_stats.socket_open[pattern]++;    \
+        g_net_stats.socket_current[pattern]++; \
     } while (0)
-#define net_stats_socket_close()      \
+#define net_stats_socket_close(pattern)      \
     do                                \
     {                                 \
-        g_net_stats.socket_close++;   \
-        g_net_stats.socket_current--; \
+        g_net_stats.socket_close[pattern]++;   \
+        g_net_stats.socket_current[pattern]--; \
     } while (0)
 #define net_stats_tx_drop(n)        \
     do                              \

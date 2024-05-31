@@ -153,6 +153,8 @@ plt.savefig('./rate_control.png')
 plt.cla()
 plt.close()
 
+plt.rcParams['figure.figsize'] = (50.0, 20.0)
+
 F3_core_cps_data = {
     1 : [1578377, 1604704, 1575061, 1610122, 1601925, 1576045, 1607081, 1608374, 1587362, 1593357, 1607341, 1601691, 1605793, 1580533, 1596585, 1607686, 1607416, 1608165, 1609741, 1588831, 1589517, 1608803, 1610031, 1609198, 1609981, 1608515, 1611375, 1606173, 1573098, 1603313],
     2 : [3931178, 3947774, 3986924, 3960580, 4001146, 3992732, 3982933, 4000860, 3959874, 4003590, 4002527, 4003917, 3983744, 4004453, 3997711, 3981410, 3839425, 3944586, 3997649, 4034621, 3992721, 4031645, 3926570, 3915896, 3983180, 3967058, 3938302, 3979644, 3999038, 4004873],
@@ -171,16 +173,16 @@ plt.plot(arrx, arry1, 'o', label='F3', markersize=40, color='blue', linewidth = 
 plt.plot(arrx, arry2, 'o', label='D-perf', markersize=40, color='red', linewidth = '4', linestyle='--')
 
 
-plt.xlim(-3, 11)
+plt.xlim(-3, 15)
 plt.xticks(list(range(1,10)),list(range(1,10)),fontsize=40)
 plt.yticks(fontsize=40)
 plt.xlabel('Number of used cores', fontsize=60)
 plt.ylabel('Max throughput of MCPS',fontsize=60)
 
 for i in range(len(arrx)):
-        plt.text(arrx[i]-3.7, arry1[i], f"({arrx[i]}cores, {int(arry1[i])}cps)", fontsize=40)
+        plt.text(arrx[i]-3, arry1[i], f"({arrx[i]}cores, {int(arry1[i])}cps)", fontsize=40)
         plt.text(arrx[i]+0.1, arry2[i], f"({arrx[i]}cores, {int(arry2[i])}cps)", fontsize=40)
-plt.legend(fontsize=52, shadow=True)
+plt.legend(fontsize=52, shadow=True, loc = "upper left")
 plt.savefig('./cps_core.png')
 
 plt.cla()
