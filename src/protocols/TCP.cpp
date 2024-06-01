@@ -893,7 +893,7 @@ static void tcp_server_process_syn(struct Socket *sk, struct rte_mbuf *m, struct
         // SOCKET_LOG_ENABLE(sk);
         // MBUF_LOG(m, "drop-syn");
         // SOCKET_LOG(sk, "drop-bad-syn");
-        tcp_unvalid_close(sk);
+        // tcp_unvalid_close(sk);
         net_stats_tcp_drop();
     }
 

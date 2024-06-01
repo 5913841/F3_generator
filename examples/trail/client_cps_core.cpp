@@ -17,6 +17,7 @@ dpdk_config_user usrconfig = {
     .gateway_for_ports = {"90:e2:ba:87:62:98"},
     .queue_num_per_port = {1},
     .always_accurate_time = false,
+    .use_preset_flowtable_size = false,
     .tx_burst_size = 64,
     .rx_burst_size = 64,
 };
@@ -28,7 +29,7 @@ protocol_config p_config = {
     .preset = true,
     .use_http = false,
     .use_keepalive = false,
-    .launch_batch = "1",
+    .launch_batch = "4",
     .cps = "0",
     .template_ip_src = "10.233.1.2",
     .template_ip_dst = "10.233.1.3"

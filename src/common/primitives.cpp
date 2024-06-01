@@ -31,6 +31,9 @@ int get_index(int pattern, int index)
 
 int thread_main(void* arg)
 {
+#ifdef DEBUG_
+    setbuf(stdout, NULL);
+#endif
     memset(primitives::socketsize_partby_pattern, 0, sizeof(primitives::socketsize_partby_pattern));
     int max_idx_of_preset = 0;
     for(int i = 0; i < g_pattern_num; i++)
