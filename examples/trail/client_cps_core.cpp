@@ -17,7 +17,7 @@ dpdk_config_user usrconfig = {
     .gateway_for_ports = {"90:e2:ba:87:62:98"},
     .queue_num_per_port = {1},
     .always_accurate_time = false,
-    .use_preset_flowtable_size = false,
+    // .use_preset_flowtable_size = false,
     .tx_burst_size = 64,
     .rx_burst_size = 64,
 };
