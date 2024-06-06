@@ -19,9 +19,9 @@ EXAMPLES := examples/trail/client_cps_core_2c.cpp examples/trail/server_cps_core
             # examples/udp_flood/main.cpp \
 # EXAMPLES := examples/tcp_syn_flood/multithread.cpp
 
-SRCS-y := src/timer/*.cpp src/common/*.cpp src/dpdk/*.cpp src/multi_thread/*.cpp src/protocols/*.cpp src/socket/*.cpp src/panel/*.cpp src/socket/socket_table/*.cpp  src/socket/socket_vector/*.cpp src/dpdk/divert/*.cpp \
+SRCS-y := src/timer/*.cpp src/common/*.cpp src/dpdk/*.cpp src/multi_thread/*.cpp src/protocols/*.cpp src/socket/*.cpp src/panel/*.cpp src/socket/socket_table/*.cpp  src/socket/socket_vector/*.cpp src/dpdk/divert/*.cpp src/api/*.cpp \
  			# src/socket/socket_table/*.cpp src/socket/socket_vector/*.cpp src/socket/socket_tree/*.cpp
-SRCS-h := src/timer/*.h src/common/*.h src/dpdk/*.h src/multi_thread/*.h src/protocols/*.h src/socket/*.h src/panel/*.h src/socket/socket_table/*.h  src/socket/socket_vector/*.h src/dpdk/divert/*.h \
+SRCS-h := src/timer/*.h src/common/*.h src/dpdk/*.h src/multi_thread/*.h src/protocols/*.h src/socket/*.h src/panel/*.h src/socket/socket_table/*.h  src/socket/socket_vector/*.h src/dpdk/divert/*.h src/api/*.h \
 
 EX_TO_NA = $(subst examples/,build/,$(subst .cpp,,$1))
 NA_TO_EX = $(subst build/,examples/,$1).cpp
