@@ -18,6 +18,8 @@ thread_local int primitives::socketpointer_partby_pattern[MAX_PATTERNS];
 
 primitives::random_socket_t primitives::random_methods[MAX_PATTERNS];
 
+void* rand_data[MAX_PATTERNS];
+
 uint8_t get_packet_pattern(rte_mbuf *m)
 {
     tcphdr* th = rte_pktmbuf_mtod_offset(m, tcphdr*, sizeof(ethhdr) + sizeof(iphdr));
@@ -202,7 +204,7 @@ repick:
                             dpdk_config_percore::time_update();
                             Socket *socket = tcp_new_socket(&template_socket[i]);
 rerand:
-                            primitives::random_methods[i](socket);
+                            primitives::random_methods[i](socket, rand_data[i]);
 
                             if (!rss_check_socket(socket) || TCP::socket_table->insert_socket(socket) == -1)
                             {
@@ -239,7 +241,7 @@ rerand:
                 {
                     for (int j = 0; j < launch_num; j++)
                     {
-                        primitives::random_methods[i](&template_socket[i]);
+                        primitives::random_methods[i](&template_socket[i], rand_data[i]);
                         udp_validate_csum(&template_socket[i]);
                         udp_send(&template_socket[i]);
                     }
@@ -266,7 +268,7 @@ rerand:
                 {
                     for (int j = 0; j < launch_num; j++)
                     {
-                        primitives::random_methods[i](&template_socket[i]);
+                        primitives::random_methods[i](&template_socket[i], rand_data[i]);
                         tcp_validate_csum_opt(&template_socket[i]);
                         tcp_reply(&template_socket[i], TH_SYN);
                     }
@@ -292,7 +294,7 @@ rerand:
                 {
                     for (int j = 0; j < launch_num; j++)
                     {
-                        primitives::random_methods[i](&template_socket[i]);
+                        primitives::random_methods[i](&template_socket[i], rand_data[i]);
                         tcp_validate_csum_pkt(&template_socket[i]);
                         tcp_reply(&template_socket[i], TH_ACK);
                     }
@@ -338,15 +340,22 @@ void primitives::add_pattern(protocol_config& p_config)
 }
 
 //should be use in preset mode
-void primitives::add_fivetuples(FiveTuples& five_tuples, int pattern)
+void primitives::add_fivetuples(const FiveTuples& five_tuples, int pattern)
 {
     sockets_ready_to_add.push_back(Socket(five_tuples, pattern));
 }
 
+void primitives::add_fivetuples(const Socket& socket, int pattern)
+{
+    sockets_ready_to_add.push_back(socket);
+    sockets_ready_to_add.back().pattern = pattern;
+}
+
 //should be use in non-preset mode
-void primitives::set_random_method(random_socket_t random_method, int pattern_num)
+void primitives::set_random_method(random_socket_t random_method, int pattern_num, void* data)
 {
     random_methods[pattern_num] = random_method;
+    
 }
 
 void primitives::set_total_time(std::string total_time)

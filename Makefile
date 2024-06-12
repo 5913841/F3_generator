@@ -61,10 +61,13 @@ CFLAGS += $(shell $(PKGCONF) --cflags libdpdk)
 LDFLAGS += $(shell $(PKGCONF) --libs libdpdk) -lpthread -lrte_net_bond -lrte_bus_pci -lrte_bus_vdev -lrte_pcapng -lrte_pdump -lrte_efd -lpcap -lstdc++
 
 
-all: build $(NAMES)
+all: build $(NAMES) F3_generator
 
 build::
 	mkdir -p build
+
+F3_generator: generator/F3_generator.cpp $(SRCS-y)
+	g++ $(CFLAGS) generator/F3_generator.cpp $(SRCS-y) -o F3_generator $(LDFLAGS)
 
 build/%: examples/%.cpp $(SRCS-y)
 	mkdir -p $(dir $@)

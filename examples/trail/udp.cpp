@@ -37,7 +37,7 @@ protocol_config p_config = {
     .template_ip_dst = "10.233.1.3"
 };
 
-void random(Socket* socket)
+void random(Socket* socket, void* data)
 {
     // socket->dst_port = rand_() % mod_dp;
     // socket->src_port = rand_() % mod_sp;
@@ -60,7 +60,7 @@ int main(int argc, char **argv)
     Socket* socket = new Socket(*template_socket);
     for(int i = 0; i < 1000000; i++)
     {
-        random(socket);
+        random(socket, NULL);
         add_fivetuples(*(FiveTuples*)socket, 0);
     }
 

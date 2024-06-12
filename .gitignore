@@ -1,10 +1,13 @@
 *
 !examples
 !src
+!generator
 !examples/*
 !src/*
+!generator/*
 !examples/**
 !src/**
+!generator/**
 !data_process
 !data_process/*
 !data_process/**
@@ -13,3 +16,6 @@
 !.gitignore
 !.gitmodules
 !makefile
+!configs
+!configs/*
+!configs/**

@@ -1,0 +1,42 @@
+{
+    "lcores" : [0],
+    "ports" : {
+        "0000:01:00.0" : "90:e2:ba:8a:c7:a1"
+    },
+    "always_accurate_time" : false,
+    "use_preset_flowtable_size" : true,
+    "flowtable_init_size" : "10003",
+    "rss_type" : "l3",
+    "rss_auto_type" : "",
+    "tx_burst_size" :64,
+    "rx_burst_size" :64,
+    "patterns" : [
+        {
+            "pattern_type" : "TCP",
+            "mode" : "client",
+            "preset": false,
+            "use_http": false,
+            "use_keepalive": false,
+            "launch_batch": "4",
+            "payload_size": "80",
+            "cps": "1M",
+
+            "fivetuples_range" : {
+                "start_src_ip" : "192.168.1.1",
+                "src_ip_num" : "100",
+
+                "start_dst_ip" : "192.168.1.2",
+                "dst_ip_num" : "100",
+
+                "start_src_port" : "80",
+                "src_port_num" : "100",
+
+                "start_dst_port" : "80",
+                "dst_port_num" : "100",
+
+                "pick_random" : false,
+                "use_flowtable" : true
+            }
+        }
+    ]
+}

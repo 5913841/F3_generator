@@ -55,7 +55,7 @@ std::vector<int> parseStringToIntVector(const std::string& str) {
     return result;
 }
 
-void random(Socket* socket)
+void random(Socket* socket, void* data)
 {
     socket->dst_port = rand_() % mod_dp;
     socket->src_port = rand_() % mod_sp;
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 
     add_pattern(p_config);
 
-    set_random_method(random, 0);
+    set_random_method(random, 0, NULL);
 
     run_generate();
 }

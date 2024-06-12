@@ -37,8 +37,6 @@
 #include "dpdk/dpdk_config.h"
 #include <cmath>
 
-#define MAX_PATTERN_NUM 4
-
 static void fdir_pattern_init_eth(struct rte_flow_item *pattern, struct rte_flow_item_eth *spec,
                                   struct rte_flow_item_eth *mask)
 {
@@ -154,8 +152,8 @@ static int fdir_new(uint8_t port_id, uint16_t rxq, ipaddr_t smask, ipaddr_t dmas
     struct rte_flow_item_eth eth_spec, eth_mask;
     struct rte_flow_item_ipv4 ip_spec, ip_mask;
     struct rte_flow_item_ipv6 ip6_spec, ip6_mask;
-    struct rte_flow_item pattern[MAX_PATTERN_NUM];
-    struct rte_flow_action action[MAX_PATTERN_NUM];
+    struct rte_flow_item pattern[MAX_PATTERNS];
+    struct rte_flow_action action[MAX_PATTERNS];
 
     fdir_action_init(action, &queue, rxq);
     fdir_pattern_init_eth(&pattern[0], &eth_spec, &eth_mask);

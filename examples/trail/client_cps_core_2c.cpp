@@ -52,7 +52,7 @@ std::vector<int> parseStringToIntVector(const std::string& str) {
     return result;
 }
 
-void random(Socket* socket)
+void random(Socket* socket, void* data)
 {
     socket->dst_port = rand_() % 20 + 1;
     socket->src_port = rand_();
@@ -86,7 +86,7 @@ int main(int argc, char **argv)
     // set_random_method(random, 0);
     for(int i = 0; i < 1000000; i++)
     {
-        random(socket);
+        random(socket, NULL);
         add_fivetuples(*(FiveTuples*)socket, 0);
     }
 

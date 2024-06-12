@@ -31,7 +31,7 @@ protocol_config p_config = {
 
 
 
-void random(Socket* socket)
+void random(Socket* socket, void* data)
 {
     socket->dst_port = rand_() % 20 + 1;
     socket->src_port = rand_();
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 
     add_pattern(p_config);
 
-    set_random_method(random, 0);
+    set_random_method(random, 0, NULL);
 
     run_generate();
 }
