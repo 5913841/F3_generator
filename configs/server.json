@@ -13,13 +13,11 @@
     "patterns" : [
         {
             "pattern_type" : "TCP",
-            "mode" : "client",
+            "mode" : "server",
             "preset": false,
             "use_http": false,
             "use_keepalive": false,
-            "launch_batch": "4",
             "payload_size": "80",
-            "cps": "1M",
 
             "fivetuples_range" : {
                 "start_src_ip" : "192.168.1.1",
