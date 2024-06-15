@@ -12,6 +12,7 @@ dpdk_config::dpdk_config(dpdk_config_user *user_config)
     : use_clear_nic_queue(user_config->use_clear_nic_queue)
 #endif
 {
+    jumbo = false;
     num_lcores = user_config->lcores.size();
     memcpy(lcores, user_config->lcores.data(), num_lcores * sizeof(int));
     num_ports = user_config->ports.size();
@@ -186,4 +187,9 @@ uint64_t &time_in_config()
         tick_time_update(&g_config_percore->time);
     }
     return g_config_percore->time.tsc;
+}
+
+int second_in_config()
+{
+    return g_config_percore->time.second.count;
 }

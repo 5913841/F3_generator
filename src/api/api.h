@@ -19,6 +19,18 @@ namespace api{
         return th->res1;
     }
 
+    uint8_t api_get_packet_l4_protocol(rte_mbuf *m)
+    {
+        iphdr* ip = rte_pktmbuf_mtod_offset(m, iphdr*, sizeof(ethhdr));
+        if(ip->version == 4)
+            return ip->protocol;
+        else
+        {
+            ip6_hdr* ip6 = rte_pktmbuf_mtod_offset(m, ip6_hdr*, sizeof(ethhdr));
+            return ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+        }
+    }
+
     bool api_socket_thscore(Socket *sk)
     {
         return rss_check_socket(sk);
@@ -178,5 +190,15 @@ namespace api{
     void api_config_protocols(int pattern, protocol_config *protocol_cfg)
     {
         config_protocols(pattern, protocol_cfg);
+    }
+
+    uint64_t& api_get_time_tsc()
+    {
+        return time_in_config();
+    }
+
+    int api_get_time_second()
+    {
+        return second_in_config();
     }
 }

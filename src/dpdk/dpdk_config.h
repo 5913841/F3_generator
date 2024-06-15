@@ -54,6 +54,7 @@ struct dpdk_config
 };
 
 uint64_t& time_in_config();
+int second_in_config();
 struct dpdk_config_percore
 {
     int epoch_work;

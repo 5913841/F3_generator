@@ -4,9 +4,11 @@
 #include <sstream>
 #include <vector>
 #include <string>
+#include <random>
 #include "json/json.hpp"
 #include "common/primitives.h"
 #include "socket/ftrange.h"
+#include "api/api.h"
 
 // #define RTE_PKTMBUF_HEADROOM 256
 #define MBUF_SIZE (2048 + sizeof(struct rte_mbuf) + RTE_PKTMBUF_HEADROOM)
@@ -64,6 +66,85 @@ void dynamic_seq_pick(Socket* socket, void* data)
     }
 }
 
+void rand_pick(Socket* socket, void* data)
+{
+    int pattern = (uint64_t) data;
+    FTRange& ftrange = ftranges[pattern];
+
+    socket->dst_addr = ftrange.start_dst_ip + rand_() % ftrange.dst_ip_num;
+    socket->src_addr = ftrange.start_src_ip + rand_() % ftrange.src_ip_num;
+    socket->src_port = ftrange.start_src_port + rand_() % ftrange.src_port_num;
+    socket->dst_port = ftrange.start_dst_port + rand_() % ftrange.dst_port_num;
+}
+
+struct ScanningData
+{
+    int pattern;
+    ip4addr_t base_dst_ip;
+    int min_cseg_num_per_round;
+    int cseg_choice_num_per_round;
+    int time_per_cseg;
+    int start_second;
+    bool preset;
+    bool pick_random;
+    int preset_idx;
+
+    ip4addr_t* ip_c_segs;
+    int ip_c_seg_num;
+    int ths_c_seg_idx;
+};
+
+void scanning_ft_pick(Socket* socket, void* data)
+{
+    ScanningData* scd = (ScanningData*) data;
+    int start_second = scd->start_second;
+    int cseg_choice_num_per_round = scd->cseg_choice_num_per_round;
+    int time_per_cseg = scd->time_per_cseg;
+    int min_cseg_num_per_round = scd->min_cseg_num_per_round;
+    ip4addr_t base_dst_ip = scd->base_dst_ip;
+    int now_second = api::api_get_time_second();
+    if(start_second == -1 || now_second >= start_second + time_per_cseg)
+    {
+        scd->start_second = now_second;
+        scd->ip_c_seg_num = rand_() % cseg_choice_num_per_round + min_cseg_num_per_round;
+        for (int i = 0; i < scd->ip_c_seg_num; i++)
+        {
+            scd->ip_c_segs[i] = base_dst_ip + ((rand_() % 256) << 8);
+        }
+        scd->ths_c_seg_idx = 0;
+    }
+    if(scd->preset)
+    {
+        socket->src_addr = primitives::socket_partby_pattern[primitives::get_index(scd->pattern,scd->preset_idx)].src_addr;
+        socket->src_port = primitives::socket_partby_pattern[primitives::get_index(scd->pattern,scd->preset_idx)].src_port;
+        socket->dst_port = primitives::socket_partby_pattern[primitives::get_index(scd->pattern,scd->preset_idx)].dst_port;
+        scd->preset_idx++;
+        if(scd->preset_idx >= primitives::socketsize_partby_pattern[scd->pattern])
+        {
+            scd->preset_idx = 0;
+        }
+    }
+    else
+    {
+        if(scd->pick_random)
+        {
+            rand_pick(socket, (void*)scd->pattern);
+        }
+        else
+        {
+            dynamic_seq_pick(socket, (void*)scd->pattern);
+        }
+    }
+    socket->dst_addr = scd->ip_c_segs[scd->ths_c_seg_idx++] + rand_() % 256;
+}
+
+struct PulseData
+{
+
+};
+
+
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -112,6 +193,8 @@ int main(int argc, char **argv)
         p_config.protocol = json_pattern["pattern_type"];
         if(json_pattern.contains("mode"))
             p_config.mode = json_pattern["mode"];
+        if(json_pattern.contains("gen_mode"))
+            p_config.gen_mode = json_pattern["gen_mode"];
         if(json_pattern.contains("preset"))
             p_config.preset = json_pattern["preset"];
         if(json_pattern.contains("use_http"))
@@ -146,6 +229,8 @@ int main(int argc, char **argv)
                 p_config.cps = json_pattern["pps"];
         if(json_pattern.contains("cc"))
             p_config.cc = json_pattern["cc"];
+        if(json_pattern.contains("slow_start"))
+            p_config.slow_start = json_pattern["slow_start"];
         if(json_pattern.contains("template_ip_src"))
             p_config.template_ip_src = json_pattern["template_ip_src"];
         if(json_pattern.contains("template_ip_dst"))
@@ -162,72 +247,120 @@ int main(int argc, char **argv)
             if(!p_config.preset)
                 std::cout << "Error: fivetuples_preset can only be used with preset pattern" << std::endl;
             FiveTuples ths_ft;
-            for (auto& fivetuple : json_pattern["fivetuples_preset"])
+            if(p_config.gen_mode == "scanning")
             {
-                ths_ft.src_addr = std::string(fivetuple["src_ip"]);
-                ths_ft.dst_addr = std::string(fivetuple["dst_ip"]);
-                ths_ft.src_port = std::atoi(std::string(fivetuple["src_port"]).c_str());
-                ths_ft.dst_port = std::atoi(std::string(fivetuple["dst_port"]).c_str());
-                primitives::add_fivetuples(ths_ft, pattern_idx);
+                for (auto& fivetuple : json_pattern["fivetuples_preset"])
+                {
+                    ths_ft.src_addr = std::string(fivetuple["src_ip"]);
+                    ths_ft.dst_addr = 0;
+                    ths_ft.src_port = std::atoi(std::string(fivetuple["src_port"]).c_str());
+                    ths_ft.dst_port = std::atoi(std::string(fivetuple["dst_port"]).c_str());
+                    primitives::add_fivetuples(ths_ft, pattern_idx);
+                }
+            }
+            else{
+                for (auto& fivetuple : json_pattern["fivetuples_preset"])
+                {
+                    ths_ft.src_addr = std::string(fivetuple["src_ip"]);
+                    ths_ft.dst_addr = std::string(fivetuple["dst_ip"]);
+                    ths_ft.src_port = std::atoi(std::string(fivetuple["src_port"]).c_str());
+                    ths_ft.dst_port = std::atoi(std::string(fivetuple["dst_port"]).c_str());
+                    primitives::add_fivetuples(ths_ft, pattern_idx);
+                }
             }
         } 
         else if(json_pattern.contains("fivetuples_range"))
         {
-            ftranges[pattern_idx].start_src_ip = std::string(json_pattern["fivetuples_range"]["start_src_ip"]);
-            ftranges[pattern_idx].src_ip_num = atoi(std::string(json_pattern["fivetuples_range"]["src_ip_num"]).c_str());
-            ftranges[pattern_idx].start_dst_ip = std::string(json_pattern["fivetuples_range"]["start_dst_ip"]);
-            ftranges[pattern_idx].dst_ip_num = atoi(std::string(json_pattern["fivetuples_range"]["dst_ip_num"]).c_str());
-            ftranges[pattern_idx].start_src_port = atoi(std::string(json_pattern["fivetuples_range"]["start_src_port"]).c_str());
-            ftranges[pattern_idx].src_port_num = atoi(std::string(json_pattern["fivetuples_range"]["src_port_num"]).c_str());
-            ftranges[pattern_idx].start_dst_port = atoi(std::string(json_pattern["fivetuples_range"]["start_dst_port"]).c_str());
-            ftranges[pattern_idx].dst_port_num = atoi(std::string(json_pattern["fivetuples_range"]["dst_port_num"]).c_str());
-            init_ft_range(&ftranges[pattern_idx]);
-            set_start_ft(&template_socket[pattern_idx], ftranges[pattern_idx]);
-            if(p_config.protocol == "TCP")
+            if(p_config.gen_mode == "scanning")
             {
-                if(p_config.preset)
+                ftranges[pattern_idx].start_src_ip = std::string(json_pattern["fivetuples_range"]["start_src_ip"]);
+                ftranges[pattern_idx].src_ip_num = atoi(std::string(json_pattern["fivetuples_range"]["src_ip_num"]).c_str());
+                ftranges[pattern_idx].start_src_port = atoi(std::string(json_pattern["fivetuples_range"]["start_src_port"]).c_str());
+                ftranges[pattern_idx].src_port_num = atoi(std::string(json_pattern["fivetuples_range"]["src_port_num"]).c_str());
+                ftranges[pattern_idx].start_dst_port = atoi(std::string(json_pattern["fivetuples_range"]["start_dst_port"]).c_str());
+                ftranges[pattern_idx].dst_port_num = atoi(std::string(json_pattern["fivetuples_range"]["dst_port_num"]).c_str());
+                init_ft_range(&ftranges[pattern_idx]);
+                set_start_ft(&template_socket[pattern_idx], ftranges[pattern_idx]);
+                if(json_pattern["fivetuples_range"].contains("pick_random") && json_pattern["fivetuples_range"]["pick_random"])
                 {
-                    if(!json_pattern["fivetuples_range"].contains("use_flowtable") || json_pattern["fivetuples_range"]["use_flowtable"])
+
+                }
+            }
+            else
+            {
+                ftranges[pattern_idx].start_src_ip = std::string(json_pattern["fivetuples_range"]["start_src_ip"]);
+                ftranges[pattern_idx].src_ip_num = atoi(std::string(json_pattern["fivetuples_range"]["src_ip_num"]).c_str());
+                ftranges[pattern_idx].start_dst_ip = std::string(json_pattern["fivetuples_range"]["start_dst_ip"]);
+                ftranges[pattern_idx].dst_ip_num = atoi(std::string(json_pattern["fivetuples_range"]["dst_ip_num"]).c_str());
+                ftranges[pattern_idx].start_src_port = atoi(std::string(json_pattern["fivetuples_range"]["start_src_port"]).c_str());
+                ftranges[pattern_idx].src_port_num = atoi(std::string(json_pattern["fivetuples_range"]["src_port_num"]).c_str());
+                ftranges[pattern_idx].start_dst_port = atoi(std::string(json_pattern["fivetuples_range"]["start_dst_port"]).c_str());
+                ftranges[pattern_idx].dst_port_num = atoi(std::string(json_pattern["fivetuples_range"]["dst_port_num"]).c_str());
+                init_ft_range(&ftranges[pattern_idx]);
+                set_start_ft(&template_socket[pattern_idx], ftranges[pattern_idx]);
+                if(p_config.protocol == "TCP")
+                {
+                    if(p_config.preset)
                     {
-                        int total_num = ftranges[pattern_idx].src_ip_num * ftranges[pattern_idx].dst_ip_num * ftranges[pattern_idx].src_port_num * ftranges[pattern_idx].dst_port_num;
-                        if(json_pattern["fivetuples_range"].contains("pick_random") && json_pattern["fivetuples_range"]["pick_random"])
+                        if(!json_pattern["fivetuples_range"].contains("use_flowtable") || json_pattern["fivetuples_range"]["use_flowtable"])
                         {
-                             
+                            int total_num = ftranges[pattern_idx].src_ip_num * ftranges[pattern_idx].dst_ip_num * ftranges[pattern_idx].src_port_num * ftranges[pattern_idx].dst_port_num;
+                            if(json_pattern["fivetuples_range"].contains("pick_random") && json_pattern["fivetuples_range"]["pick_random"])
+                            {
+                                std::vector<int> idxs;
+                                for(int i=0; i<total_num; i++)
+                                {
+                                    idxs.push_back(i);
+                                }
+                                std::shuffle(idxs.begin(), idxs.end(), std::mt19937(std::random_device{}()));
+                                for(int i=0; i<total_num; i++)
+                                {
+                                    set_by_range_idx_ft(&template_socket[pattern_idx], ftranges[pattern_idx], idxs[i]);
+                                    primitives::add_fivetuples(template_socket[pattern_idx], pattern_idx);
+                                }
+                            }
+                            else
+                            {
+                                for(int i=0; i<total_num; i++)
+                                {
+                                    primitives::add_fivetuples(template_socket[pattern_idx], pattern_idx);
+                                    increase_ft(&template_socket[pattern_idx], ftranges[pattern_idx]);
+                                }
+                            }
                         }
                         else
                         {
-                            for(int i=0; i<total_num; i++)
-                            {
-                                primitives::add_fivetuples(template_socket[pattern_idx], pattern_idx);
-                                increase_ft(&template_socket[pattern_idx], ftranges[pattern_idx]);
-                            }
+
                         }
                     }
                     else
                     {
+                        if(!json_pattern["fivetuples_range"].contains("use_flowtable") || json_pattern["fivetuples_range"]["use_flowtable"])
+                        {
+                            if(json_pattern["fivetuples_range"].contains("pick_random") && json_pattern["fivetuples_range"]["pick_random"])
+                            {
+                                if(p_config.mode == "client")
+                                {
+                                    primitives::set_random_method(rand_pick, pattern_idx, (void*) pattern_idx);
+                                }
+                            }
+                            else
+                            {
+                                if(p_config.mode == "client")
+                                {
+                                    primitives::set_random_method(dynamic_seq_pick, pattern_idx, (void*) pattern_idx);
+                                }
+                            }
+                        }
+                        else
+                        {
 
+                        }
                     }
                 }
                 else
                 {
-                    if(!json_pattern["fivetuples_range"].contains("use_flowtable") || json_pattern["fivetuples_range"]["use_flowtable"])
-                    {
-                        if(json_pattern["fivetuples_range"].contains("pick_random") && json_pattern["fivetuples_range"]["pick_random"])
-                        {
 
-                        }
-                        else
-                        {
-                            if(p_config.mode == "client")
-                            {
-                                primitives::set_random_method(dynamic_seq_pick, pattern_idx, (void*) pattern_idx);
-                            }
-                        }
-                    }
-                    else
-                    {
-
-                    }
                 }
             }
         }

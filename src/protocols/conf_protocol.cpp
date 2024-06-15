@@ -10,6 +10,23 @@ thread_local mbuf_cache template_tcp_opt[MAX_PATTERNS];
 thread_local mbuf_cache template_tcp_pkt[MAX_PATTERNS];
 thread_local char const* data[MAX_PATTERNS];
 
+gen_type get_g_type(const std::string& g_mode)
+{
+    if(g_mode == "default")
+    {
+        return default_gen;
+    }
+    else if(g_mode == "scanning")
+    {
+        return scanning_gen;
+    }
+    else if(g_mode == "pulse")
+    {
+        return pulse_gen;
+    }
+    return default_gen;
+}
+
 char *config_str_find_nondigit(char *s, bool float_enable)
 {
     char *p = s;
@@ -114,11 +131,9 @@ uint64_t config_parse_time(const char *str)
 void config_protocols(int pattern, protocol_config *protocol_cfg)
 {
     ether->port = g_config_percore->port;
-#ifdef USE_CTL_THREAD
-    g_vars[pattern].slow_start = atoi(protocol_cfg->slow_start.data());
+    g_vars[pattern].slow_start = protocol_cfg->slow_start;
     g_vars[pattern].launch_num = atoi(protocol_cfg->launch_batch.data());
     g_vars[pattern].cps = config_parse_number(protocol_cfg->cps.c_str(), true, true);
-#endif
     if(protocol_cfg->protocol == "TCP"){
         g_vars[pattern].p_type = p_tcp;
         g_vars[pattern].tcp_vars.flood = protocol_cfg->just_send_first_packet;
@@ -216,6 +231,7 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
     else if(protocol_cfg->protocol == "UDP")
     {
         g_vars[pattern].p_type = p_udp;
+        g_vars[pattern].g_type = get_g_type(protocol_cfg->gen_mode);
         g_vars[pattern].udp_vars.flood = protocol_cfg->just_send_first_packet;
         g_vars[pattern].tcp_vars.global_keepalive = protocol_cfg->use_keepalive;
         g_vars[pattern].udp_vars.keepalive_request_interval = config_parse_time(protocol_cfg->keepalive_interval.data());
@@ -249,6 +265,7 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
     else if(protocol_cfg->protocol == "TCP_SYN")
     {
         g_vars[pattern].p_type = p_tcp_syn;
+        g_vars[pattern].g_type = get_g_type(protocol_cfg->gen_mode);
         template_socket[pattern].protocol = IPPROTO_TCP;
         template_socket[pattern].pattern = pattern;
         template_socket[pattern].src_addr = ip4addr_t(protocol_cfg->template_ip_src);
@@ -299,6 +316,7 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
     else if(protocol_cfg->protocol == "TCP_ACK")
     {
         g_vars[pattern].p_type = p_tcp_ack;
+        g_vars[pattern].g_type = get_g_type(protocol_cfg->gen_mode);
         template_socket[pattern].protocol = IPPROTO_TCP;
         template_socket[pattern].pattern = pattern;
         template_socket[pattern].src_addr = ip4addr_t(protocol_cfg->template_ip_src);

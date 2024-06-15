@@ -18,7 +18,49 @@ thread_local int primitives::socketpointer_partby_pattern[MAX_PATTERNS];
 
 primitives::random_socket_t primitives::random_methods[MAX_PATTERNS];
 
+primitives::update_speed_t primitives::update_speed_methods[MAX_PATTERNS];
+
+uint8_t pattern_order[MAX_PATTERNS];
+
 void* rand_data[MAX_PATTERNS];
+
+void* update_speed_data[MAX_PATTERNS];
+
+void update_speed_default(launch_control* lc, void* data)
+{
+    return;
+}
+
+struct slow_start_data
+{
+    int pattern;
+    int second_prev;
+    int step;
+};
+
+void update_speed_slow_start(launch_control* lc, void* data)
+{
+    slow_start_data* ssd = (slow_start_data*)data;
+    int pattern = ssd->pattern;
+    int second_prev = ssd->second_prev;
+    int slow_start = g_vars[pattern].slow_start;
+    int second_now = second_in_config();
+    if(second_now <= slow_start && slow_start != 0 && second_now > second_prev){
+        int launch_num = g_vars[pattern].launch_num;
+        // int step = (g_vars[pattern].cps / g_config->num_lcores) / slow_start;
+        int step = ssd->step;
+        if (step <= 0) {
+            step = 1;
+        }
+        int cps = step * second_now;
+        uint64_t launch_interval;
+        if(cps == 0) launch_interval = UINT64_MAX;
+        else launch_interval = (g_tsc_per_second * launch_num) / cps;
+        launch_control *lc = &g_config_percore->launch_ctls[pattern];
+        lc->launch_interval = launch_interval;
+        second_prev = second_now;
+    }
+}
 
 uint8_t get_packet_pattern(rte_mbuf *m)
 {
@@ -26,9 +68,52 @@ uint8_t get_packet_pattern(rte_mbuf *m)
     return th->res1;
 }
 
-int get_index(int pattern, int index)
+uint8_t get_packet_l4_protocol(rte_mbuf *m)
+{
+    iphdr* ip = rte_pktmbuf_mtod_offset(m, iphdr*, sizeof(ethhdr));
+    if(ip->version == 4)
+        return ip->protocol;
+    else
+    {
+        ip6_hdr* ip6 = rte_pktmbuf_mtod_offset(m, ip6_hdr*, sizeof(ethhdr));
+        return ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+    }
+}
+
+int min_idx_of_preset = INT_MAX;
+
+int primitives::get_index(int pattern, int index)
 {
     return (pattern * MAX_SOCKETS_RANGE_PER_PATTERN + index);
+}
+
+void check_and_reoder_pattern()
+{
+    for(int i = 0; i < g_pattern_num; i++)
+    {
+        pattern_order[i] = i;
+    }
+    if(primitives::p_configs[0].protocol != "TCP")
+    {
+        return;
+    }
+    for(int i = 1; i < g_pattern_num; i++)
+    {
+        if (primitives::p_configs[i].protocol != "TCP")
+        {
+            pattern_order[0] = i;
+            pattern_order[i] = 0;
+            std::swap(primitives::p_configs[0], primitives::p_configs[i]);
+            std::swap(primitives::random_methods[0], primitives::random_methods[i]);
+            std::swap(primitives::update_speed_methods[0], primitives::update_speed_methods[i]);
+            for(int i = 0; i < primitives::sockets_ready_to_add.size(); i++)
+            {
+                Socket& socket = primitives::sockets_ready_to_add[i];
+                socket.pattern = pattern_order[socket.pattern];
+            }
+            break;
+        }
+    }
 }
 
 int thread_main(void* arg)
@@ -36,21 +121,43 @@ int thread_main(void* arg)
 #ifdef DEBUG_
     setbuf(stdout, NULL);
 #endif
+    check_and_reoder_pattern();
     memset(primitives::socketsize_partby_pattern, 0, sizeof(primitives::socketsize_partby_pattern));
     int max_idx_of_preset = 0;
     for(int i = 0; i < g_pattern_num; i++)
     {
         if(primitives::p_configs[i].preset)
         {
+            min_idx_of_preset = std::min(min_idx_of_preset, i);
             max_idx_of_preset = std::max(max_idx_of_preset, i+1);
         }
     }
-    primitives::socket_partby_pattern = new Socket[max_idx_of_preset * MAX_SOCKETS_RANGE_PER_PATTERN];
+    
+    if(min_idx_of_preset != INT_MAX) primitives::socket_partby_pattern = new Socket[(max_idx_of_preset-min_idx_of_preset) * MAX_SOCKETS_RANGE_PER_PATTERN];
 
     for(int i = 0; i < g_pattern_num ; i++)
     {
         config_protocols(i, &primitives::p_configs[i]);
     }
+
+    for(int i = 0; i < g_pattern_num; i++)
+    {
+        if (primitives::update_speed_methods[i] == NULL)
+        {
+            if (g_vars[i].slow_start != 0 && (g_vars[i].p_type != p_tcp || !g_vars[i].tcp_vars.server))
+            {
+                primitives::update_speed_methods[i] = update_speed_slow_start;
+                slow_start_data* ssd = new slow_start_data;
+                ssd->pattern = i;
+                ssd->second_prev = 0;
+                ssd->step = (g_vars[i].cps / g_config->num_lcores) / g_vars[i].slow_start;
+                update_speed_data[i] = ssd;
+            }
+            else
+                primitives::update_speed_methods[i] = update_speed_default;
+        }
+    }
+
     for(int i = primitives::sockets_ready_to_add.size()-1; i >= 0; i--)
     {
         Socket socket = primitives::sockets_ready_to_add[i];
@@ -74,7 +181,7 @@ int thread_main(void* arg)
                 memcpy(ths_socket, &socket, sizeof(FiveTuples));
                 ths_socket->protocol = IPPROTO_TCP;
                 tcp_validate_csum(ths_socket);
-                primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
+                primitives::socket_partby_pattern[primitives::get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
                 primitives::socketsize_partby_pattern[socket.pattern]++;
                 delete ths_socket;
             }
@@ -85,7 +192,7 @@ int thread_main(void* arg)
             memcpy(ths_socket, &socket, sizeof(FiveTuples));
             ths_socket->protocol = IPPROTO_UDP;
             udp_validate_csum(ths_socket);
-            primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
+            primitives::socket_partby_pattern[primitives::get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
             primitives::socketsize_partby_pattern[socket.pattern]++;
             delete ths_socket;
         }
@@ -95,7 +202,7 @@ int thread_main(void* arg)
             memcpy(ths_socket, &socket, sizeof(FiveTuples));
             ths_socket->protocol = IPPROTO_TCP;
             tcp_validate_csum_opt(ths_socket);
-            primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
+            primitives::socket_partby_pattern[primitives::get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
             primitives::socketsize_partby_pattern[socket.pattern]++;
             delete ths_socket;
         }
@@ -105,7 +212,7 @@ int thread_main(void* arg)
             memcpy(ths_socket, &socket, sizeof(FiveTuples));
             ths_socket->protocol = IPPROTO_TCP;
             tcp_validate_csum_pkt(ths_socket);
-            primitives::socket_partby_pattern[get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
+            primitives::socket_partby_pattern[primitives::get_index(socket.pattern, primitives::socketsize_partby_pattern[socket.pattern])] = *ths_socket;
             primitives::socketsize_partby_pattern[socket.pattern]++;
             delete ths_socket;
         }
@@ -130,25 +237,40 @@ int thread_main(void* arg)
             {
                 break;
             }
-            uint8_t pattern = get_packet_pattern(m);
-            if(g_vars[pattern].p_type == p_tcp){
-                Socket* parse_socket = parse_packet(m);
-                Socket *socket = TCP::socket_table->find_socket(parse_socket);
-                if (socket == nullptr)
-                {
-                    socket = tcp_new_socket(&template_socket[pattern]);
-                    socket->pattern = pattern;
-                    memcpy(socket, parse_socket, sizeof(FiveTuples));
+            uint8_t l4_protocol = get_packet_l4_protocol(m);
+            if(l4_protocol == IPPROTO_TCP)
+            {
+                uint8_t pattern = get_packet_pattern(m);
+                if(g_vars[pattern].p_type == p_tcp){
+                    Socket* parse_socket = parse_packet(m);
+                    Socket *socket = TCP::socket_table->find_socket(parse_socket);
+                    if (socket == nullptr)
+                    {
+                        socket = tcp_new_socket(&template_socket[pattern]);
+                        socket->pattern = pattern;
+                        memcpy(socket, parse_socket, sizeof(FiveTuples));
+                    }
+                    socket->tcp.process(socket, m);
                 }
-                socket->tcp.process(socket, m);
+                else if (g_vars[pattern].p_type == p_tcp_syn)
+                {
+                    mbuf_free2(m);
+                    net_stats_tcp_drop();
+                    net_stats_tcp_rx();
+                    net_stats_syn_rx();
+                }
+                else if (g_vars[pattern].p_type == p_tcp_ack)
+                {
+                    mbuf_free2(m);
+                    net_stats_tcp_drop();
+                    net_stats_tcp_rx();
+                }
             }
-            else if (g_vars[pattern].p_type == p_udp)
+            else if(l4_protocol == IPPROTO_UDP)
             {
-
-            }
-            else if (g_vars[pattern].p_type == p_tcp_syn || g_vars[pattern].p_type == p_tcp_ack)
-            {
-
+                mbuf_free2(m);
+                net_stats_udp_drop();
+                net_stats_udp_rx();
             }
         } while (recv_num < 4);
 
@@ -170,6 +292,7 @@ int thread_main(void* arg)
                 else
                 {
                     int fail_cnt = 0;
+                    primitives::update_speed_methods[i](&g_config_percore->launch_ctls[i], update_speed_data[i]);
                     int launch_num = dpdk_config_percore::check_epoch_timer(i);
                     if(g_vars[i].tcp_vars.preset)
                     {
@@ -177,7 +300,7 @@ int thread_main(void* arg)
                         {
                             dpdk_config_percore::time_update();
 repick:
-                            Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
+                            Socket *socket = &primitives::socket_partby_pattern[primitives::get_index(i, primitives::socketpointer_partby_pattern[i])];
                             primitives::socketpointer_partby_pattern[i]++;
                             
                             if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
@@ -224,11 +347,11 @@ rerand:
             else if(g_vars[i].p_type == p_udp)
             {
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
-                if(g_vars[i].udp_vars.preset)
+                if(g_vars[i].udp_vars.preset && !g_vars[i].g_type == scanning_gen)
                 {
                     for (int j = 0; j < launch_num; j++)
                     {
-                        Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
+                        Socket *socket = &primitives::socket_partby_pattern[primitives::get_index(i, primitives::socketpointer_partby_pattern[i])];
                         primitives::socketpointer_partby_pattern[i]++;
                         if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
                         {
@@ -248,14 +371,14 @@ rerand:
                 }
                 
             }
-            else if (g_vars[i].p_type == p_tcp_syn)
+            else if (g_vars[i].p_type == p_tcp_syn && !g_vars[i].g_type == scanning_gen)
             {
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
                 if(g_vars[i].tcp_vars.preset)
                 {
                     for (int j = 0; j < launch_num; j++)
                     {
-                        Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
+                        Socket *socket = &primitives::socket_partby_pattern[primitives::get_index(i, primitives::socketpointer_partby_pattern[i])];
                         primitives::socketpointer_partby_pattern[i]++;
                         if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
                         {
@@ -274,14 +397,14 @@ rerand:
                     }
                 }
             }
-            else if (g_vars[i].p_type == p_tcp_ack)
+            else if (g_vars[i].p_type == p_tcp_ack && !g_vars[i].g_type == scanning_gen)
             {
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
                 if(g_vars[i].tcp_vars.preset)
                 {
                     for (int j = 0; j < launch_num; j++)
                     {
-                        Socket *socket = &primitives::socket_partby_pattern[get_index(i, primitives::socketpointer_partby_pattern[i])];
+                        Socket *socket = &primitives::socket_partby_pattern[primitives::get_index(i, primitives::socketpointer_partby_pattern[i])];
                         primitives::socketpointer_partby_pattern[i]++;
                         if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
                         {
@@ -355,7 +478,13 @@ void primitives::add_fivetuples(const Socket& socket, int pattern)
 void primitives::set_random_method(random_socket_t random_method, int pattern_num, void* data)
 {
     random_methods[pattern_num] = random_method;
-    
+    rand_data[pattern_num] = data;
+}
+
+void primitives::set_update_speed_method(update_speed_t update_speed_method, int pattern_num, void* data)
+{
+    update_speed_methods[pattern_num] = update_speed_method;
+    update_speed_data[pattern_num] = data;
 }
 
 void primitives::set_total_time(std::string total_time)

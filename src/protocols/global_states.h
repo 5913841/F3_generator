@@ -13,8 +13,15 @@ enum protocol_type {
     p_tcp_ack,
 };
 
+enum gen_type {
+    default_gen,
+    scanning_gen,
+    pulse_gen,
+};
+
 struct global_states {
     protocol_type p_type;
+    gen_type g_type;
     global_tcp_vars tcp_vars;
     global_udp_vars udp_vars;
     global_http_vars http_vars;

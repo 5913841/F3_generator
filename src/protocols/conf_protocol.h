@@ -26,6 +26,7 @@ extern thread_local char const* data[MAX_PATTERNS];
 struct protocol_config {
     std::string protocol = "TCP";
     std::string mode = "client";
+    std::string gen_mode = "default";
     bool preset = false;
     bool use_http = false;
     bool use_keepalive = false;
@@ -41,13 +42,11 @@ struct protocol_config {
     std::string cps = "1m";
     std::string tos = "0";
     std::string cc = "0";
+    int slow_start = 0;
     std::string template_ip_src = "192.168.1.1";
     std::string template_ip_dst = "192.168.1.2";
     std::string template_port_src = "80";
     std::string template_port_dst = "80";
-#ifdef USE_CTL_THREAD
-    std::string slow_start = "0";
-#endif
 };
 
 
