@@ -6,8 +6,6 @@
     "always_accurate_time" : false,
     "use_preset_flowtable_size" : true,
     "flowtable_init_size" : "10003",
-    "rss_type" : "l3",
-    "rss_auto_type" : "",
     "tx_burst_size" :64,
     "rx_burst_size" :64,
     "patterns" : [
@@ -17,7 +15,6 @@
             "preset": false,
             "use_http": false,
             "use_keepalive": false,
-            "payload_size": "80",
 
             "fivetuples_range" : {
                 "start_src_ip" : "192.168.1.1",

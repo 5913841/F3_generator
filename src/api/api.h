@@ -15,20 +15,20 @@ namespace api{
 
     uint8_t api_get_syn_pattern_by_res(rte_mbuf *mbuf)
     {
-        tcphdr* th = rte_pktmbuf_mtod_offset(mbuf, tcphdr*, sizeof(ethhdr) + sizeof(iphdr));
-        return th->res1;
+        return rte_pktmbuf_mtod_offset(mbuf, tcphdr*, sizeof(ethhdr) + sizeof(iphdr))->res1;
     }
 
-    uint8_t api_get_packet_l4_protocol(rte_mbuf *m)
+    const uint8_t& api_get_packet_l4_protocol(rte_mbuf *m)
     {
-        iphdr* ip = rte_pktmbuf_mtod_offset(m, iphdr*, sizeof(ethhdr));
-        if(ip->version == 4)
-            return ip->protocol;
-        else
-        {
-            ip6_hdr* ip6 = rte_pktmbuf_mtod_offset(m, ip6_hdr*, sizeof(ethhdr));
-            return ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
-        }
+    // iphdr* ip = rte_pktmbuf_mtod_offset(m, iphdr*, sizeof(ethhdr));
+    if(rte_pktmbuf_mtod_offset(m, const uint8_t*, sizeof(ethhdr))[0] & 0x0f == 0x0f)
+    {
+        return rte_pktmbuf_mtod_offset(m, iphdr*, sizeof(ethhdr))->protocol;
+    }
+    else
+    {
+        return rte_pktmbuf_mtod_offset(m, ip6_hdr*, sizeof(ethhdr))->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+    }
     }
 
     bool api_socket_thscore(Socket *sk)

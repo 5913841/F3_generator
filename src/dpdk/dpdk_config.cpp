@@ -24,7 +24,7 @@ dpdk_config::dpdk_config(dpdk_config_user *user_config)
 
     if(!use_preset_flowtable_size)
     {
-        flowtable_init_size = 100000;
+        flowtable_init_size = 10003;
     }
     else
     {

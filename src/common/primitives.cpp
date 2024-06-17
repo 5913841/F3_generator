@@ -68,15 +68,16 @@ uint8_t get_packet_pattern(rte_mbuf *m)
     return th->res1;
 }
 
-uint8_t get_packet_l4_protocol(rte_mbuf *m)
+const uint8_t& get_packet_l4_protocol(rte_mbuf *m)
 {
-    iphdr* ip = rte_pktmbuf_mtod_offset(m, iphdr*, sizeof(ethhdr));
-    if(ip->version == 4)
-        return ip->protocol;
+    // iphdr* ip = rte_pktmbuf_mtod_offset(m, iphdr*, sizeof(ethhdr));
+    if(rte_pktmbuf_mtod_offset(m, const uint8_t*, sizeof(ethhdr))[0] & 0x0f == 0x0f)
+    {
+        return rte_pktmbuf_mtod_offset(m, iphdr*, sizeof(ethhdr))->protocol;
+    }
     else
     {
-        ip6_hdr* ip6 = rte_pktmbuf_mtod_offset(m, ip6_hdr*, sizeof(ethhdr));
-        return ip6->ip6_ctlun.ip6_un1.ip6_un1_nxt;
+        return rte_pktmbuf_mtod_offset(m, ip6_hdr*, sizeof(ethhdr))->ip6_ctlun.ip6_un1.ip6_un1_nxt;
     }
 }
 
@@ -84,7 +85,7 @@ int min_idx_of_preset = INT_MAX;
 
 int primitives::get_index(int pattern, int index)
 {
-    return (pattern * MAX_SOCKETS_RANGE_PER_PATTERN + index);
+    return ((pattern - min_idx_of_preset) * MAX_SOCKETS_RANGE_PER_PATTERN + index);
 }
 
 void check_and_reoder_pattern()
@@ -237,10 +238,10 @@ int thread_main(void* arg)
             {
                 break;
             }
-            uint8_t l4_protocol = get_packet_l4_protocol(m);
+            const uint8_t& l4_protocol = get_packet_l4_protocol(m);
+            uint8_t pattern = get_packet_pattern(m);
             if(l4_protocol == IPPROTO_TCP)
             {
-                uint8_t pattern = get_packet_pattern(m);
                 if(g_vars[pattern].p_type == p_tcp){
                     Socket* parse_socket = parse_packet(m);
                     Socket *socket = TCP::socket_table->find_socket(parse_socket);

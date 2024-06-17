@@ -28,9 +28,50 @@ json get_json(std::string filename)
 }
 
 FTRange ftranges[MAX_PATTERNS];
-
 bool seq_picked[MAX_PATTERNS] = {false, false, false, false};
 int seq_idx[MAX_PATTERNS] = {0, 0, 0, 0};
+
+int stringToInt(const std::string &str) {
+    int num = 0;
+    for (char c : str) {
+        if (std::isdigit(c)) {
+            num = num * 10 + (c - '0');
+        } else {
+            break;
+        }
+    }
+    return num;
+}
+
+int parse_time_to_seconds(const std::string &time_str) {
+    // Determine the length of the input string
+    int len = time_str.length();
+    if (len == 0) return 0;
+
+    // Find the first non-digit character
+    int i = 0;
+    while (i < len && std::isdigit(time_str[i])) {
+        ++i;
+    }
+
+    // Extract the numeric part
+    int num = stringToInt(time_str);
+
+    // Determine the unit of time
+    std::string unit = time_str.substr(i);
+
+    // Convert to seconds based on the unit
+    if (unit == "h") {
+        return num * 3600;  // hours to seconds
+    } else if (unit == "min" || unit == "m") {
+        return num * 60;    // minutes to seconds
+    } else if (unit == "s" || unit == "") {
+        return num;         // seconds
+    } else {
+        // If the unit is unrecognized, return 0 or handle as needed
+        return 0;
+    }
+}
 
 
 void static_seq_pick(Socket* socket, void* data)
@@ -140,9 +181,45 @@ void scanning_ft_pick(Socket* socket, void* data)
 
 struct PulseData
 {
+    int pattern;
+    uint64_t max_speed_interval;
 
+    tsc_time start_tsc;
+    tsc_time end_tsc;
 };
 
+void init_pulse_data(PulseData* pd, int pattern, int max_pps, uint64_t attack_interval, uint64_t duration_each_time, uint64_t start_time)
+{
+    pd->pattern = pattern;
+    pd->max_speed_interval = g_tsc_per_second / max_pps;
+
+    pd->start_tsc.last = time_in_config() + start_time - attack_interval;
+    pd->end_tsc.last = time_in_config() + start_time + duration_each_time - attack_interval;
+    pd->start_tsc.interval = attack_interval;
+    pd->end_tsc.interval = attack_interval;
+    pd->start_tsc.count = 0;
+    pd->end_tsc.count = 0;
+}
+
+void update_speed_pulse(launch_control* lc, void* data)
+{
+    PulseData* pd = (PulseData*) data;
+    if(unlikely(time_in_config() < pd->start_tsc.last))
+    {
+        lc->launch_interval = 0;
+    }
+    if(unlikely(tsc_time_go(&pd->start_tsc, time_in_config())))
+    {
+        lc->launch_interval = pd->max_speed_interval;
+    }
+    if(unlikely(tsc_time_go(&pd->end_tsc, time_in_config())))
+    {
+        lc->launch_interval = 0;
+    }
+}
+
+ScanningData scanning_data[MAX_PATTERNS];
+PulseData pulse_data[MAX_PATTERNS];
 
 
 int main(int argc, char **argv)
@@ -242,6 +319,31 @@ int main(int argc, char **argv)
 
         primitives::add_pattern(p_config);
 
+        if(p_config.gen_mode == "scanning")
+        {
+            ScanningData& scd = scanning_data[pattern_idx];
+            scd.pattern = pattern_idx;
+            scd.base_dst_ip = std::string(json_pattern["scanning"]["base_dst_ip"]);
+            scd.min_cseg_num_per_round = json_pattern["scanning"]["min_cseg_num_per_round"];
+            scd.cseg_choice_num_per_round = (int)json_pattern["scanning"]["max_cseg_num_per_round"] - (int)json_pattern["scanning"]["min_cseg_num_per_round"];
+            scd.time_per_cseg = parse_time_to_seconds(std::string(json_pattern["scanning"]["time_per_cseg"]));
+            scd.start_second = -1;
+            scd.preset = p_config.preset;
+            scd.pick_random = json_pattern["scanning"]["pick_random"];
+            scd.preset_idx = 0;
+            primitives::set_random_method(scanning_ft_pick, pattern_idx, (void*) &scanning_data[pattern_idx]);
+        }
+        else if(p_config.gen_mode == "pulse")
+        {
+            PulseData& pd = pulse_data[pattern_idx];
+
+            init_pulse_data(&pd, pattern_idx, config_parse_number(std::string(json_pattern["pulse"]["max_pps"]).c_str(), true, true),
+                                                config_parse_time(std::string(json_pattern["pulse"]["attack_interval"]).c_str()),
+                                                config_parse_time(std::string(json_pattern["pulse"]["duration_each_time"]).c_str()),
+                                                config_parse_time(std::string(json_pattern["pulse"]["start_time"]).c_str()));
+            primitives::set_update_speed_method(update_speed_pulse, pattern_idx, (void*) &pulse_data[pattern_idx]);
+        }
+
         if(json_pattern.contains("fivetuples_preset"))
         {
             if(!p_config.preset)
@@ -268,7 +370,7 @@ int main(int argc, char **argv)
                     primitives::add_fivetuples(ths_ft, pattern_idx);
                 }
             }
-        } 
+        }
         else if(json_pattern.contains("fivetuples_range"))
         {
             if(p_config.gen_mode == "scanning")
@@ -283,6 +385,18 @@ int main(int argc, char **argv)
                 set_start_ft(&template_socket[pattern_idx], ftranges[pattern_idx]);
                 if(json_pattern["fivetuples_range"].contains("pick_random") && json_pattern["fivetuples_range"]["pick_random"])
                 {
+                    int total_num = ftranges[pattern_idx].src_ip_num * ftranges[pattern_idx].dst_ip_num * ftranges[pattern_idx].src_port_num * ftranges[pattern_idx].dst_port_num;
+                    std::vector<int> idxs;
+                    for(int i=0; i<total_num; i++)
+                    {
+                        idxs.push_back(i);
+                    }
+                    std::shuffle(idxs.begin(), idxs.end(), std::mt19937(std::random_device{}()));
+                    for(int i=0; i<total_num; i++)
+                    {
+                        set_by_range_idx_ft(&template_socket[pattern_idx], ftranges[pattern_idx], idxs[i]);
+                        primitives::add_fivetuples(template_socket[pattern_idx], pattern_idx);
+                    }
 
                 }
             }
