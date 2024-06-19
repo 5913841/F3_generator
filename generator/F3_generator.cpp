@@ -280,8 +280,6 @@ int main(int argc, char **argv)
             p_config.mode = json_pattern["mode"];
         if(json_pattern.contains("preset"))
             p_config.preset = json_pattern["preset"];
-        if(json_pattern.contains("use_flowtable"))
-            p_config.preset = json_pattern["use_flowtable"];
         if(json_pattern.contains("use_http"))
             p_config.use_http = json_pattern["use_http"];
         if(json_pattern.contains("use_keepalive"))
@@ -324,6 +322,8 @@ int main(int argc, char **argv)
             p_config.template_port_src = json_pattern["template_port_src"];
         if(json_pattern.contains("template_port_dst"))
             p_config.template_port_dst = json_pattern["template_port_dst"];
+        if(json_pattern.contains("fivetuples_range") && json_pattern["fivetuples_range"].contains("use_flowtable"))
+            p_config.use_flowtable = json_pattern["fivetuples_range"]["use_flowtable"];
 
         primitives::add_pattern(p_config);
 

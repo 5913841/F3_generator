@@ -26,7 +26,7 @@ void* rand_data[MAX_PATTERNS];
 
 void* update_speed_data[MAX_PATTERNS];
 
-Socket* five_tuples_pointer[MAX_PATTERNS];
+Socket five_tuples_pointer[MAX_PATTERNS];
 FTRange* five_tuples_range_pointer[MAX_PATTERNS];
 
 void update_speed_default(launch_control* lc, void* data)
@@ -232,12 +232,14 @@ int thread_main(void* arg)
             if(g_vars[i].tcp_vars.preset)
             {
                 five_tuples_range_pointer[i] = &g_vars[i].tcp_vars.socket_range_table->range;
-                set_start_ft(five_tuples_pointer[i], *five_tuples_range_pointer[i]);
+                set_start_ft(&five_tuples_pointer[i], *five_tuples_range_pointer[i]);
+                five_tuples_pointer[i].pattern = i;
             }
             else
             {
                 five_tuples_range_pointer[i] = &g_vars[i].tcp_vars.socket_pointer_range_table->range;
-                set_start_ft(five_tuples_pointer[i], *five_tuples_range_pointer[i]);
+                set_start_ft(&five_tuples_pointer[i], *five_tuples_range_pointer[i]);
+                five_tuples_pointer[i].pattern = i;
             }
         }
     }
@@ -348,8 +350,8 @@ repick:
                             {
                                 dpdk_config_percore::time_update();
 repick_noft:
-                                Socket *socket = five_tuples_pointer[i];
-                                increase_ft(five_tuples_pointer[i], *five_tuples_range_pointer[i]);
+                                Socket *socket = &five_tuples_pointer[i];
+                                increase_ft(&five_tuples_pointer[i], *five_tuples_range_pointer[i]);
                                 if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
                                 {
                                     primitives::socketpointer_partby_pattern[i] = 0;

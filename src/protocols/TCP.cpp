@@ -135,7 +135,7 @@ int tcp_insert_socket(Socket *socket, int pattern)
         }
         else
         {
-            return g_vars[pattern].tcp_vars.socket_range_table->insert_socket(socket);
+            return g_vars[pattern].tcp_vars.socket_pointer_range_table->insert_socket(socket);
         }
     }
 }
@@ -154,7 +154,7 @@ Socket* tcp_find_socket(Socket* socket, int pattern)
         }
         else
         {
-            return g_vars[pattern].tcp_vars.socket_range_table->find_socket(socket);
+            return g_vars[pattern].tcp_vars.socket_pointer_range_table->find_socket(socket);
         }
     }
 }
@@ -173,7 +173,7 @@ int tcp_remove_socket(Socket *socket, int pattern)
         }
         else
         {
-            return g_vars[pattern].tcp_vars.socket_range_table->remove_socket(socket);
+            return g_vars[pattern].tcp_vars.socket_pointer_range_table->remove_socket(socket);
         }
     }
 }

@@ -24,6 +24,7 @@ struct SocketRangeTable {
         }
         valid[idx] = true;
         socket_table[idx] = *socket;
+        delete socket;
         return 0;
     }
 
