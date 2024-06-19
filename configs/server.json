@@ -12,15 +12,15 @@
         {
             "pattern_type" : "TCP",
             "mode" : "server",
-            "preset": false,
+            "preset": true,
             "use_http": false,
             "use_keepalive": false,
 
             "fivetuples_range" : {
-                "start_src_ip" : "192.168.1.1",
-                "src_ip_num" : "100",
+                "start_src_ip" : "192.168.1.2",
+                "src_ip_num" : "2",
 
-                "start_dst_ip" : "192.168.1.2",
+                "start_dst_ip" : "192.168.1.1",
                 "dst_ip_num" : "100",
 
                 "start_src_port" : "80",
@@ -30,7 +30,7 @@
                 "dst_port_num" : "100",
 
                 "pick_random" : false,
-                "use_flowtable" : true
+                "use_flowtable" : false
             }
         }
     ]

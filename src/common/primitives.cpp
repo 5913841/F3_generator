@@ -26,6 +26,9 @@ void* rand_data[MAX_PATTERNS];
 
 void* update_speed_data[MAX_PATTERNS];
 
+Socket* five_tuples_pointer[MAX_PATTERNS];
+FTRange* five_tuples_range_pointer[MAX_PATTERNS];
+
 void update_speed_default(launch_control* lc, void* data)
 {
     return;
@@ -222,6 +225,22 @@ int thread_main(void* arg)
     primitives::sockets_ready_to_add.resize(0);
 
     memset(primitives::socketpointer_partby_pattern, 0, sizeof(primitives::socketpointer_partby_pattern));
+    for(int i = 0; i < g_pattern_num; i++)
+    {
+        if(!g_vars[i].tcp_vars.use_flowtable)
+        {
+            if(g_vars[i].tcp_vars.preset)
+            {
+                five_tuples_range_pointer[i] = &g_vars[i].tcp_vars.socket_range_table->range;
+                set_start_ft(five_tuples_pointer[i], *five_tuples_range_pointer[i]);
+            }
+            else
+            {
+                five_tuples_range_pointer[i] = &g_vars[i].tcp_vars.socket_pointer_range_table->range;
+                set_start_ft(five_tuples_pointer[i], *five_tuples_range_pointer[i]);
+            }
+        }
+    }
 
     g_config_percore->start = true;
     while (g_config_percore->start)
@@ -297,28 +316,56 @@ int thread_main(void* arg)
                     int launch_num = dpdk_config_percore::check_epoch_timer(i);
                     if(g_vars[i].tcp_vars.preset)
                     {
-                        for (int j = 0; j < launch_num; j++)
+                        if(g_vars[i].tcp_vars.use_flowtable)
                         {
-                            dpdk_config_percore::time_update();
+                            for (int j = 0; j < launch_num; j++)
+                            {
+                                dpdk_config_percore::time_update();
 repick:
-                            Socket *socket = &primitives::socket_partby_pattern[primitives::get_index(i, primitives::socketpointer_partby_pattern[i])];
-                            primitives::socketpointer_partby_pattern[i]++;
-                            
-                            if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
-                            {
-                                primitives::socketpointer_partby_pattern[i] = 0;
-                            }
-
-                            if (tcp_insert_socket(socket, i) == -1)
-                            {
-                                if(unlikely(fail_cnt >= RERAND_MAX_NUM))
+                                Socket *socket = &primitives::socket_partby_pattern[primitives::get_index(i, primitives::socketpointer_partby_pattern[i])];
+                                primitives::socketpointer_partby_pattern[i]++;
+                                
+                                if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
                                 {
-                                    goto continue_epoch;
+                                    primitives::socketpointer_partby_pattern[i] = 0;
                                 }
-                                fail_cnt++;
-                                goto repick;
+
+                                if (tcp_insert_socket(socket, i) == -1)
+                                {
+                                    if(unlikely(fail_cnt >= RERAND_MAX_NUM))
+                                    {
+                                        goto continue_epoch;
+                                    }
+                                    fail_cnt++;
+                                    goto repick;
+                                }
+                                tcp_launch(socket);
                             }
-                            tcp_launch(socket);
+                        }
+                        else
+                        {
+                            for (int j = 0; j < launch_num; j++)
+                            {
+                                dpdk_config_percore::time_update();
+repick_noft:
+                                Socket *socket = five_tuples_pointer[i];
+                                increase_ft(five_tuples_pointer[i], *five_tuples_range_pointer[i]);
+                                if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
+                                {
+                                    primitives::socketpointer_partby_pattern[i] = 0;
+                                }
+
+                                if (tcp_insert_socket(socket, i) == -1)
+                                {
+                                    if(unlikely(fail_cnt >= RERAND_MAX_NUM))
+                                    {
+                                        goto continue_epoch;
+                                    }
+                                    fail_cnt++;
+                                    goto repick_noft;
+                                }
+                                tcp_launch(socket);
+                            }
                         }
                     }
                     else

@@ -32,7 +32,7 @@
                 "dst_port_num" : "100",
 
                 "pick_random" : false,
-                "use_flowtable" : true
+                "use_flowtable" : false
             }
         }
     ]
