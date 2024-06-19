@@ -280,6 +280,8 @@ int main(int argc, char **argv)
             p_config.mode = json_pattern["mode"];
         if(json_pattern.contains("preset"))
             p_config.preset = json_pattern["preset"];
+        if(json_pattern.contains("use_flowtable"))
+            p_config.preset = json_pattern["use_flowtable"];
         if(json_pattern.contains("use_http"))
             p_config.use_http = json_pattern["use_http"];
         if(json_pattern.contains("use_keepalive"))
@@ -389,12 +391,21 @@ int main(int argc, char **argv)
                 ftranges[pattern_idx].src_port_num = atoi(std::string(json_pattern["fivetuples_range"]["src_port_num"]).c_str());
                 ftranges[pattern_idx].start_dst_port = atoi(std::string(json_pattern["fivetuples_range"]["start_dst_port"]).c_str());
                 ftranges[pattern_idx].dst_port_num = atoi(std::string(json_pattern["fivetuples_range"]["dst_port_num"]).c_str());
+                if(!json_pattern["fivetuples_range"].contains("use_flowtable") || json_pattern["fivetuples_range"]["use_flowtable"])
+                {
+                    p_config.use_flowtable = true;
+                }
+                else
+                {
+                    p_config.use_flowtable = false;
+                }
                 init_ft_range(&ftranges[pattern_idx]);
                 set_start_ft(&template_socket[pattern_idx], ftranges[pattern_idx]);
                 int total_num = ftranges[pattern_idx].src_ip_num * ftranges[pattern_idx].src_port_num * ftranges[pattern_idx].dst_port_num;
                 if(p_config.preset){
                     if(json_pattern["fivetuples_range"].contains("pick_random") && json_pattern["fivetuples_range"]["pick_random"])
-                    {                        std::vector<int> idxs;
+                    {                        
+                        std::vector<int> idxs;
                         for(int i=0; i<total_num; i++)
                         {
                             idxs.push_back(i);
