@@ -2,6 +2,7 @@
 #define CONF_PROTOCOL_H
 
 #include "socket/socket.h"
+#include "socket/ftrange.h"
 #include "dpdk/dpdk.h"
 #include "dpdk/dpdk_config.h"
 #include "dpdk/dpdk_config_user.h"
@@ -11,6 +12,8 @@
 #include "protocols/HTTP.h"
 #include "socket/socket_table/socket_table.h"
 #include "socket/socket_tree/socket_tree.h"
+#include "socket/socket_range/socket_prange.h"
+#include "socket/socket_range/socket_range.h"
 #include "protocols/base_protocol.h"
 #include <rte_lcore.h>
 
@@ -26,8 +29,8 @@ extern thread_local char const* data[MAX_PATTERNS];
 struct protocol_config {
     std::string protocol = "TCP";
     std::string mode = "client";
-    std::string gen_mode = "default";
     bool preset = false;
+    bool use_flowtable = true;
     bool use_http = false;
     bool use_keepalive = false;
     std::string keepalive_interval = "1ms";
@@ -47,6 +50,7 @@ struct protocol_config {
     std::string template_ip_dst = "192.168.1.2";
     std::string template_port_src = "80";
     std::string template_port_dst = "80";
+    FTRange ft_range;
 };
 
 

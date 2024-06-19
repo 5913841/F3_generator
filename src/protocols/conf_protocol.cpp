@@ -10,22 +10,6 @@ thread_local mbuf_cache template_tcp_opt[MAX_PATTERNS];
 thread_local mbuf_cache template_tcp_pkt[MAX_PATTERNS];
 thread_local char const* data[MAX_PATTERNS];
 
-gen_type get_g_type(const std::string& g_mode)
-{
-    if(g_mode == "default")
-    {
-        return default_gen;
-    }
-    else if(g_mode == "scanning")
-    {
-        return scanning_gen;
-    }
-    else if(g_mode == "pulse")
-    {
-        return pulse_gen;
-    }
-    return default_gen;
-}
 
 char *config_str_find_nondigit(char *s, bool float_enable)
 {
@@ -175,6 +159,7 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
         g_templates[pattern].tcp_templates.template_tcp_opt = &template_tcp_opt[pattern];
         g_templates[pattern].tcp_templates.template_tcp_pkt = &template_tcp_pkt[pattern];
         g_vars[pattern].tcp_vars.preset = protocol_cfg->preset;
+        g_vars[pattern].tcp_vars.use_flowtable = protocol_cfg->use_flowtable;
         g_vars[pattern].tcp_vars.use_http = protocol_cfg->use_http;
         g_vars[pattern].tcp_vars.global_mss = atoi(protocol_cfg->mss.data());
 
@@ -226,12 +211,23 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
             }
         }
 
+        if(!protocol_cfg->use_flowtable)
+        {
+            init_ft_range(&protocol_cfg->ft_range);
+            if(protocol_cfg->preset){
+                g_vars[pattern].tcp_vars.socket_range_table = new SocketRangeTable(protocol_cfg->ft_range);
+            }
+            else
+            {
+                g_vars[pattern].tcp_vars.socket_pointer_range_table = new SocketPointerRangeTable(protocol_cfg->ft_range);
+            }
+        }
+
         TCP::tcp_init(pattern);
     }
     else if(protocol_cfg->protocol == "UDP")
     {
         g_vars[pattern].p_type = p_udp;
-        g_vars[pattern].g_type = get_g_type(protocol_cfg->gen_mode);
         g_vars[pattern].udp_vars.flood = protocol_cfg->just_send_first_packet;
         g_vars[pattern].tcp_vars.global_keepalive = protocol_cfg->use_keepalive;
         g_vars[pattern].udp_vars.keepalive_request_interval = config_parse_time(protocol_cfg->keepalive_interval.data());
@@ -265,7 +261,6 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
     else if(protocol_cfg->protocol == "TCP_SYN")
     {
         g_vars[pattern].p_type = p_tcp_syn;
-        g_vars[pattern].g_type = get_g_type(protocol_cfg->gen_mode);
         template_socket[pattern].protocol = IPPROTO_TCP;
         template_socket[pattern].pattern = pattern;
         template_socket[pattern].src_addr = ip4addr_t(protocol_cfg->template_ip_src);
@@ -316,7 +311,6 @@ void config_protocols(int pattern, protocol_config *protocol_cfg)
     else if(protocol_cfg->protocol == "TCP_ACK")
     {
         g_vars[pattern].p_type = p_tcp_ack;
-        g_vars[pattern].g_type = get_g_type(protocol_cfg->gen_mode);
         template_socket[pattern].protocol = IPPROTO_TCP;
         template_socket[pattern].pattern = pattern;
         template_socket[pattern].src_addr = ip4addr_t(protocol_cfg->template_ip_src);

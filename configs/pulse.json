@@ -1,0 +1,38 @@
+{
+    "lcores" : [0],
+    "ports" : {
+        "0000:01:00.0" : "90:e2:ba:8a:c7:a1"
+    },
+    "always_accurate_time" : false,
+    "tx_burst_size" :64,
+    "rx_burst_size" :64,
+    "patterns" : [
+        {
+            "pattern_type" : "TCP_ACK",
+            "gen_mode" : "pulse",
+            "preset": false,
+            "launch_batch": "4",
+            "payload_random": false,
+            "payload_size": "80",
+            "max_pps": "1m",
+            "duration_each_time": "1s",
+            "attack_interval": "2s",
+            "start_time": "5s",
+            "fivetuples_range" : {
+                "start_src_ip" : "192.168.1.1",
+                "src_ip_num" : "100",
+
+                "start_dst_ip" : "192.168.1.2",
+                "dst_ip_num" : "100",
+
+                "start_src_port" : "80",
+                "src_port_num" : "100",
+
+                "start_dst_port" : "80",
+                "dst_port_num" : "100",
+
+                "pick_random" : false
+            }
+        }
+    ]
+}

@@ -8,6 +8,8 @@
 #include <random>
 #include "timer/rand.h"
 #include "socket/socket_table/socket_table.h"
+#include "socket/socket_range/socket_prange.h"
+#include "socket/socket_range/socket_range.h"
 #include "protocols/global_states.h"
 
 
@@ -74,7 +76,8 @@ void TCP::tcp_init(int pattern)
 {
     srand_(rte_rdtsc());
     timer_init(pattern);
-    socket_table->socket_table.reserve(g_config->flowtable_init_size);
+    if(g_vars[pattern].tcp_vars.use_flowtable)
+        socket_table->socket_table.reserve(g_config->flowtable_init_size);
 }
 
 int TCP::construct(Socket *socket, rte_mbuf *data)
@@ -115,6 +118,64 @@ int TCP::construct(Socket *socket, rte_mbuf *data)
     data->l4_len = sizeof(struct tcphdr) + opt_len;
     rte_pktmbuf_prepend(data, sizeof(struct tcphdr));
     return sizeof(struct tcphdr) + opt_len;
+}
+
+
+int tcp_insert_socket(Socket *socket, int pattern)
+{
+    if (g_vars[pattern].tcp_vars.use_flowtable)
+    {
+        return TCP::socket_table->insert_socket(socket);
+    }
+    else
+    {
+        if(g_vars[pattern].tcp_vars.preset)
+        {
+            return g_vars[pattern].tcp_vars.socket_range_table->insert_socket(socket);
+        }
+        else
+        {
+            return g_vars[pattern].tcp_vars.socket_range_table->insert_socket(socket);
+        }
+    }
+}
+
+Socket* tcp_find_socket(Socket* socket, int pattern)
+{
+    if (g_vars[pattern].tcp_vars.use_flowtable)
+    {
+        return TCP::socket_table->find_socket(socket);
+    }
+    else
+    {
+        if(g_vars[pattern].tcp_vars.preset)
+        {
+            return g_vars[pattern].tcp_vars.socket_range_table->find_socket(socket);
+        }
+        else
+        {
+            return g_vars[pattern].tcp_vars.socket_range_table->find_socket(socket);
+        }
+    }
+}
+
+int tcp_remove_socket(Socket *socket, int pattern)
+{
+    if (g_vars[pattern].tcp_vars.use_flowtable)
+    {
+        return TCP::socket_table->remove_socket(socket);
+    }
+    else
+    {
+        if(g_vars[pattern].tcp_vars.preset)
+        {
+            return g_vars[pattern].tcp_vars.socket_range_table->remove_socket(socket);
+        }
+        else
+        {
+            return g_vars[pattern].tcp_vars.socket_range_table->remove_socket(socket);
+        }
+    }
 }
 
 static inline void tcp_flags_rx_count(uint8_t tcp_flags)
@@ -230,17 +291,31 @@ static inline void tcp_send_packet(rte_mbuf *m, struct Socket *sk)
 
 static inline void tcp_unvalid_close(struct Socket *sk)
 {
-    if(g_vars[sk->pattern].tcp_vars.preset){
-        if(g_vars[sk->pattern].tcp_vars.server)
-            return;
+    if(g_vars[sk->pattern].tcp_vars.use_flowtable)
+    {
+        if(g_vars[sk->pattern].tcp_vars.preset){
+            if(g_vars[sk->pattern].tcp_vars.server)
+                return;
+            else
+                sk->tcp.state = TCP_CLOSE;
+                TCP::socket_table->remove_socket(sk);
+        }
         else
-            sk->tcp.state = TCP_CLOSE;
+        {
             TCP::socket_table->remove_socket(sk);
+            tcp_release_socket(sk);
+        }
     }
     else
     {
-        TCP::socket_table->remove_socket(sk);
-        tcp_release_socket(sk);
+        if(g_vars[sk->pattern].tcp_vars.preset){
+            g_vars[sk->pattern].tcp_vars.socket_range_table->remove_socket(sk);
+        }
+        else
+        {
+            g_vars[sk->pattern].tcp_vars.socket_pointer_range_table->remove_socket(sk);
+            tcp_release_socket(sk);
+        }
     }
 }
 
@@ -266,7 +341,7 @@ static inline void tcp_socket_create(struct Socket *sk)
     {
         if (!g_vars[sk->pattern].tcp_vars.preset)
         {
-            TCP::socket_table->insert_socket(sk);
+            tcp_insert_socket(sk, sk->pattern);
         }
         tcp_validate_csum(sk);
     }

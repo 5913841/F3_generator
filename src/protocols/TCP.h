@@ -4,11 +4,13 @@
 // the file implements the TCP protocol based on IPv4 and ethernet, you can modify or write your own TCP protocol based on other l3 protocols.
 
 #include <netinet/tcp.h>
-#include "dpdk/mbuf_template.h"
 #include <functional>
+#include "dpdk/mbuf_template.h"
 #include "timer/rand.h"
 #include "timer/unique_timer.h"
 
+struct SocketPointerRangeTable;
+struct SocketRangeTable;
 struct SocketPointerTable;
 struct FiveTuples;
 
@@ -48,7 +50,10 @@ struct global_tcp_vars
     uint16_t global_mss;
     bool constructing_opt_tmeplate;
     SocketPointerTable* socket_table;
+    SocketPointerRangeTable* socket_pointer_range_table;
+    SocketRangeTable* socket_range_table;
     bool preset;
+    bool use_flowtable;
 };
 
 struct global_tcp_templates{
@@ -116,4 +121,11 @@ void tcp_validate_csum_opt(Socket* scoket);
 void tcp_validate_csum_pkt(Socket *socket);
 
 void tcp_validate_csum_data(Socket *socket);
+
+int tcp_insert_socket(Socket *socket, int pattern);
+
+Socket* tcp_find_socket(Socket* socket, int pattern);
+
+int tcp_remove_socket(Socket *socket, int pattern);
+
 #endif

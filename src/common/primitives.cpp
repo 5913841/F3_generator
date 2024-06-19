@@ -54,9 +54,9 @@ void update_speed_slow_start(launch_control* lc, void* data)
         }
         int cps = step * second_now;
         uint64_t launch_interval;
-        if(cps == 0) launch_interval = UINT64_MAX;
+        if(cps == 0) launch_interval = g_tsc_per_second * (1 << 14);
         else launch_interval = (g_tsc_per_second * launch_num) / cps;
-        launch_control *lc = &g_config_percore->launch_ctls[pattern];
+        lc->launch_last = time_in_config();
         lc->launch_interval = launch_interval;
         second_prev = second_now;
     }
@@ -168,13 +168,13 @@ int thread_main(void* arg)
         }
         if(g_vars[socket.pattern].p_type == p_tcp)
         {
-            if(g_vars[socket.pattern].tcp_vars.server)
+            if(g_vars[socket.pattern].tcp_vars.server || !g_vars[socket.pattern].tcp_vars.use_flowtable)
             {
                 Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
                 memcpy(ths_socket, &socket, sizeof(FiveTuples));
                 ths_socket->protocol = IPPROTO_TCP;
                 tcp_validate_csum(ths_socket);
-                TCP::socket_table->insert_socket(ths_socket);
+                tcp_insert_socket(ths_socket, ths_socket->pattern);
             }
             else
             {
@@ -244,7 +244,7 @@ int thread_main(void* arg)
             {
                 if(g_vars[pattern].p_type == p_tcp){
                     Socket* parse_socket = parse_packet(m);
-                    Socket *socket = TCP::socket_table->find_socket(parse_socket);
+                    Socket *socket = tcp_find_socket(parse_socket, pattern);
                     if (socket == nullptr)
                     {
                         socket = tcp_new_socket(&template_socket[pattern]);
@@ -309,7 +309,7 @@ repick:
                                 primitives::socketpointer_partby_pattern[i] = 0;
                             }
 
-                            if (TCP::socket_table->insert_socket(socket) == -1)
+                            if (tcp_insert_socket(socket, i) == -1)
                             {
                                 if(unlikely(fail_cnt >= RERAND_MAX_NUM))
                                 {
@@ -330,7 +330,7 @@ repick:
 rerand:
                             primitives::random_methods[i](socket, rand_data[i]);
 
-                            if (!rss_check_socket(socket) || TCP::socket_table->insert_socket(socket) == -1)
+                            if (!rss_check_socket(socket) || tcp_insert_socket(socket, i) == -1)
                             {
                                 if(unlikely(fail_cnt >= RERAND_MAX_NUM))
                                 {
@@ -347,8 +347,9 @@ rerand:
             }
             else if(g_vars[i].p_type == p_udp)
             {
+                primitives::update_speed_methods[i](&g_config_percore->launch_ctls[i], update_speed_data[i]);
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
-                if(g_vars[i].udp_vars.preset && !g_vars[i].g_type == scanning_gen)
+                if(g_vars[i].udp_vars.preset)
                 {
                     for (int j = 0; j < launch_num; j++)
                     {
@@ -372,8 +373,9 @@ rerand:
                 }
                 
             }
-            else if (g_vars[i].p_type == p_tcp_syn && !g_vars[i].g_type == scanning_gen)
+            else if (g_vars[i].p_type == p_tcp_syn)
             {
+                primitives::update_speed_methods[i](&g_config_percore->launch_ctls[i], update_speed_data[i]);
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
                 if(g_vars[i].tcp_vars.preset)
                 {
@@ -398,8 +400,9 @@ rerand:
                     }
                 }
             }
-            else if (g_vars[i].p_type == p_tcp_ack && !g_vars[i].g_type == scanning_gen)
+            else if (g_vars[i].p_type == p_tcp_ack)
             {
+                primitives::update_speed_methods[i](&g_config_percore->launch_ctls[i], update_speed_data[i]);
                 int launch_num = dpdk_config_percore::check_epoch_timer(i);
                 if(g_vars[i].tcp_vars.preset)
                 {

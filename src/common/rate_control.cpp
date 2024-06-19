@@ -8,8 +8,8 @@ uint64_t get_launch_num(launch_control* lc, int pattern)
     uint64_t gap = 0;
     uint64_t cc = lc->cc;
 
-    if (lc->launch_next <= time_in_config()) {
-        lc->launch_next += lc->launch_interval;
+    if (lc->launch_last + lc->launch_interval <= time_in_config()) {
+        lc->launch_last += lc->launch_interval;
         if (cc > 0) {
             if (g_net_stats.socket_current[pattern] < cc) {
                 gap = cc - g_net_stats.socket_current[pattern];
@@ -74,7 +74,7 @@ int launch_control_init(struct launch_control *lc, int total_cps, int total_cc, 
         lc->launch_interval = (g_tsc_per_second / (cps / lc->launch_num));
     }
     lc->launch_interval_default = lc->launch_interval;
-    lc->launch_next = rte_rdtsc() + g_tsc_per_second * 1;
+    lc->launch_last = rte_rdtsc() + g_tsc_per_second * 1;
 
     return 0;
 }
