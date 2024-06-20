@@ -121,7 +121,7 @@ int TCP::construct(Socket *socket, rte_mbuf *data)
 }
 
 
-int tcp_insert_socket(Socket *socket, int pattern)
+int tcp_insert_socket(Socket* &socket, int pattern)
 {
     if (g_vars[pattern].tcp_vars.use_flowtable)
     {

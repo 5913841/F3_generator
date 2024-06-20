@@ -122,7 +122,7 @@ void tcp_validate_csum_pkt(Socket *socket);
 
 void tcp_validate_csum_data(Socket *socket);
 
-int tcp_insert_socket(Socket *socket, int pattern);
+int tcp_insert_socket(Socket *&socket, int pattern);
 
 Socket* tcp_find_socket(Socket* socket, int pattern);
 

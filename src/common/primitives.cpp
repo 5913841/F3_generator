@@ -170,17 +170,8 @@ int thread_main(void* arg)
             continue;
         }
         if(g_vars[socket.pattern].p_type == p_tcp)
-        {
-            if(!g_vars[socket.pattern].tcp_vars.use_flowtable)
-            {
-                Socket* ths_socket = new Socket(template_socket[socket.pattern]);
-                memcpy(ths_socket, &socket, sizeof(FiveTuples));
-                ths_socket->protocol = IPPROTO_TCP;
-                tcp_validate_csum(ths_socket);
-                tcp_insert_socket(ths_socket, ths_socket->pattern);
-                delete ths_socket;
-            }
-            else if(g_vars[socket.pattern].tcp_vars.server)
+        { 
+            if(g_vars[socket.pattern].tcp_vars.server || !g_vars[socket.pattern].tcp_vars.use_flowtable)
             {
                 Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
                 memcpy(ths_socket, &socket, sizeof(FiveTuples));
@@ -361,12 +352,13 @@ repick:
 repick_noft:
                                 Socket *socket = &five_tuples_pointer[i];
                                 increase_ft(&five_tuples_pointer[i], *five_tuples_range_pointer[i]);
+                                socket = tcp_find_socket(socket, i);
                                 if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
                                 {
                                     primitives::socketpointer_partby_pattern[i] = 0;
                                 }
 
-                                if (tcp_insert_socket(socket, i) == -1)
+                                if (!socket || socket->tcp.state != TCP_CLOSE)
                                 {
                                     if(unlikely(fail_cnt >= RERAND_MAX_NUM))
                                     {

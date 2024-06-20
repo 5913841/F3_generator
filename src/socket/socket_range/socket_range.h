@@ -16,7 +16,7 @@ struct SocketRangeTable {
         valid = new bool[range.total_num];
     }
 
-    int insert_socket(Socket* socket)
+    int insert_socket(Socket*& socket)
     {
         int idx = get_range_idx_ft(*socket, range);
         if (valid[idx]) {
@@ -24,6 +24,8 @@ struct SocketRangeTable {
         }
         valid[idx] = true;
         socket_table[idx] = *socket;
+        delete socket;
+        socket = &socket_table[idx];
         return 0;
     }
 
