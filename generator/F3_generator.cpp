@@ -322,8 +322,20 @@ int main(int argc, char **argv)
             p_config.template_port_src = json_pattern["template_port_src"];
         if(json_pattern.contains("template_port_dst"))
             p_config.template_port_dst = json_pattern["template_port_dst"];
-        if(json_pattern.contains("fivetuples_range") && json_pattern["fivetuples_range"].contains("use_flowtable"))
-            p_config.use_flowtable = json_pattern["fivetuples_range"]["use_flowtable"];
+        if(json_pattern.contains("fivetuples_range"))
+        {
+            p_config.ft_range.start_src_ip = std::string(json_pattern["fivetuples_range"]["start_src_ip"]);
+            p_config.ft_range.src_ip_num = atoi(std::string(json_pattern["fivetuples_range"]["src_ip_num"]).c_str());
+            p_config.ft_range.start_src_port = atoi(std::string(json_pattern["fivetuples_range"]["start_src_port"]).c_str());
+            p_config.ft_range.start_dst_ip = std::string(json_pattern["fivetuples_range"]["start_dst_ip"]);
+            p_config.ft_range.dst_ip_num = atoi(std::string(json_pattern["fivetuples_range"]["dst_ip_num"]).c_str());
+            p_config.ft_range.src_port_num = atoi(std::string(json_pattern["fivetuples_range"]["src_port_num"]).c_str());
+            p_config.ft_range.start_dst_port = atoi(std::string(json_pattern["fivetuples_range"]["start_dst_port"]).c_str());
+            p_config.ft_range.dst_port_num = atoi(std::string(json_pattern["fivetuples_range"]["dst_port_num"]).c_str());
+            init_ft_range(&p_config.ft_range);
+            if(json_pattern["fivetuples_range"].contains("use_flowtable"))
+                p_config.use_flowtable = json_pattern["fivetuples_range"]["use_flowtable"];
+        }
 
         primitives::add_pattern(p_config);
 
@@ -391,14 +403,6 @@ int main(int argc, char **argv)
                 ftranges[pattern_idx].src_port_num = atoi(std::string(json_pattern["fivetuples_range"]["src_port_num"]).c_str());
                 ftranges[pattern_idx].start_dst_port = atoi(std::string(json_pattern["fivetuples_range"]["start_dst_port"]).c_str());
                 ftranges[pattern_idx].dst_port_num = atoi(std::string(json_pattern["fivetuples_range"]["dst_port_num"]).c_str());
-                if(!json_pattern["fivetuples_range"].contains("use_flowtable") || json_pattern["fivetuples_range"]["use_flowtable"])
-                {
-                    p_config.use_flowtable = true;
-                }
-                else
-                {
-                    p_config.use_flowtable = false;
-                }
                 init_ft_range(&ftranges[pattern_idx]);
                 set_start_ft(&template_socket[pattern_idx], ftranges[pattern_idx]);
                 int total_num = ftranges[pattern_idx].src_ip_num * ftranges[pattern_idx].src_port_num * ftranges[pattern_idx].dst_port_num;
@@ -477,7 +481,6 @@ int main(int argc, char **argv)
                     }
                     else
                     {
-                        p_config.ft_range = ftranges[pattern_idx];
                         int total_num = ftranges[pattern_idx].total_num;
                         for(int i=0; i<total_num; i++)
                         {

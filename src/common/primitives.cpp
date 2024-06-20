@@ -381,24 +381,31 @@ repick_noft:
                     }
                     else
                     {
-                        for (int j = 0; j < launch_num; j++)
+                        if(g_vars[i].tcp_vars.use_flowtable)
                         {
-                            dpdk_config_percore::time_update();
-                            Socket *socket = tcp_new_socket(&template_socket[i]);
-rerand:
-                            primitives::random_methods[i](socket, rand_data[i]);
-
-                            if (!rss_check_socket(socket) || tcp_insert_socket(socket, i) == -1)
+                            for (int j = 0; j < launch_num; j++)
                             {
-                                if(unlikely(fail_cnt >= RERAND_MAX_NUM))
+                                dpdk_config_percore::time_update();
+                                Socket *socket = tcp_new_socket(&template_socket[i]);
+rerand:
+                                primitives::random_methods[i](socket, rand_data[i]);
+
+                                if (!rss_check_socket(socket) || tcp_insert_socket(socket, i) == -1)
                                 {
-                                    goto continue_epoch;
+                                    if(unlikely(fail_cnt >= RERAND_MAX_NUM))
+                                    {
+                                        goto continue_epoch;
+                                    }
+                                    fail_cnt++;
+                                    goto rerand;
                                 }
-                                fail_cnt++;
-                                goto rerand;
+                                tcp_validate_csum(socket);
+                                tcp_launch(socket);
                             }
-                            tcp_validate_csum(socket);
-                            tcp_launch(socket);
+                        }
+                        else
+                        {
+                            
                         }
                     }
                 }
