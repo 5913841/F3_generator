@@ -171,7 +171,16 @@ int thread_main(void* arg)
         }
         if(g_vars[socket.pattern].p_type == p_tcp)
         {
-            if(g_vars[socket.pattern].tcp_vars.server || !g_vars[socket.pattern].tcp_vars.use_flowtable)
+            if(!g_vars[socket.pattern].tcp_vars.use_flowtable)
+            {
+                Socket* ths_socket = new Socket(template_socket[socket.pattern]);
+                memcpy(ths_socket, &socket, sizeof(FiveTuples));
+                ths_socket->protocol = IPPROTO_TCP;
+                tcp_validate_csum(ths_socket);
+                tcp_insert_socket(ths_socket, ths_socket->pattern);
+                delete ths_socket;
+            }
+            else if(g_vars[socket.pattern].tcp_vars.server)
             {
                 Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
                 memcpy(ths_socket, &socket, sizeof(FiveTuples));
