@@ -59,7 +59,7 @@ void update_speed_slow_start(launch_control* lc, void* data)
         uint64_t launch_interval;
         if(cps == 0) launch_interval = g_tsc_per_second * (1 << 14);
         else launch_interval = (g_tsc_per_second * launch_num) / cps;
-        lc->launch_last = time_in_config();
+        // lc->launch_last = time_in_config();
         lc->launch_interval = launch_interval;
         second_prev = second_now;
     }
@@ -397,7 +397,30 @@ rerand:
                         }
                         else
                         {
-                            
+                            for (int j = 0; j < launch_num; j++)
+                            {
+                                dpdk_config_percore::time_update();
+repick_nopstft:
+                                increase_ft(&five_tuples_pointer[i], *five_tuples_range_pointer[i]);
+                                if (unlikely(primitives::socketpointer_partby_pattern[i] >= primitives::socketsize_partby_pattern[i]))
+                                {
+                                    primitives::socketpointer_partby_pattern[i] = 0;
+                                }
+                                Socket *socket = tcp_new_socket(&template_socket[i]);
+                                memcpy(socket, &five_tuples_pointer[i], sizeof(FiveTuples));
+
+                                if (!rss_check_socket(socket) || tcp_insert_socket(socket, i) == -1)
+                                {
+                                    if(unlikely(fail_cnt >= RERAND_MAX_NUM))
+                                    {
+                                        goto continue_epoch;
+                                    }
+                                    fail_cnt++;
+                                    goto repick_nopstft;
+                                }
+                                tcp_validate_csum(socket);
+                                tcp_launch(socket);
+                            }
                         }
                     }
                 }

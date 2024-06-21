@@ -309,7 +309,7 @@ static inline void tcp_unvalid_close(struct Socket *sk)
     else
     {
         if(g_vars[sk->pattern].tcp_vars.preset){
-            g_vars[sk->pattern].tcp_vars.socket_range_table->remove_socket(sk);
+            // g_vars[sk->pattern].tcp_vars.socket_range_table->remove_socket(sk);
         }
         else
         {
@@ -981,7 +981,7 @@ static void tcp_client_process_syn_ack(struct Socket *sk,
 {
     TCP *tcp = &sk->tcp;
     uint32_t ack = ntohl(th->th_ack);
-        uint32_t seq = htonl(th->th_seq);
+    uint32_t seq = htonl(th->th_seq);
 
     if (tcp->state == TCP_SYN_SENT)
     {
