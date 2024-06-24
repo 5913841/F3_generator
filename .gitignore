@@ -12,10 +12,10 @@
 !data_process/*
 !data_process/**
 !dumpcap
-!*.sh
 !.gitignore
 !.gitmodules
 !makefile
-!configs
-!configs/*
-!configs/**
+!config_examples
+!config_examples/*
+!config_examples/**
+!README.md

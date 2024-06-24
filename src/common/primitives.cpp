@@ -10,6 +10,7 @@ std::vector<protocol_config> primitives::p_configs;
 std::vector<Socket> primitives::sockets_ready_to_add;
 
 // thread_local Socket* primitives::socket_partby_pattern = new Socket[MAX_PATTERNS * MAX_SOCKETS_RANGE_PER_PATTERN];
+
 thread_local Socket* primitives::socket_partby_pattern;
 
 thread_local int primitives::socketsize_partby_pattern[MAX_PATTERNS];
@@ -175,7 +176,7 @@ int thread_main(void* arg)
             {
                 Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
                 memcpy(ths_socket, &socket, sizeof(FiveTuples));
-                ths_socket->protocol = IPPROTO_TCP;
+                ths_socket->protocol = TO_TCP;
                 tcp_validate_csum(ths_socket);
                 tcp_insert_socket(ths_socket, ths_socket->pattern);
             }
