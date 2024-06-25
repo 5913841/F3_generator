@@ -67,7 +67,7 @@ int start_test(__rte_unused void *arg1)
 
 int main(int argc, char **argv)
 {
-    api::api_set_configs_and_init(usrconfig, argv);
+    api::api_set_configs_and_init(usrconfig, new char*());
     api::api_set_pattern_num(1);
     api::api_config_protocols(0, &p_config);
     start_test(NULL);

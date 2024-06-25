@@ -53,7 +53,7 @@ struct global_tcp_vars
     SocketPointerRangeTable* socket_pointer_range_table;
     SocketRangeTable* socket_range_table;
     bool preset;
-    bool use_flowtable;
+    bool use_flowtable = true;
 };
 
 struct global_tcp_templates{

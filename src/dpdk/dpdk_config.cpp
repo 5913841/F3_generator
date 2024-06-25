@@ -19,6 +19,7 @@ dpdk_config::dpdk_config(dpdk_config_user *user_config)
     always_accurate_time = user_config->always_accurate_time;
     tx_burst_size = user_config->tx_burst_size;
     rx_burst_size = user_config->rx_burst_size;
+    memcpy(socket_mem, user_config->socket_mem.data(), RTE_ARG_LEN > user_config->socket_mem.size() ? user_config->socket_mem.size()+1 : RTE_ARG_LEN+1);
 
     use_preset_flowtable_size = user_config->use_preset_flowtable_size;
 
