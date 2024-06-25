@@ -176,7 +176,7 @@ int thread_main(void* arg)
             {
                 Socket* ths_socket = tcp_new_socket(&template_socket[socket.pattern]);
                 memcpy(ths_socket, &socket, sizeof(FiveTuples));
-                ths_socket->protocol = TO_TCP;
+                ths_socket->protocol = IPPROTO_TCP;
                 tcp_validate_csum(ths_socket);
                 tcp_insert_socket(ths_socket, ths_socket->pattern);
             }
