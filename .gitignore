@@ -15,6 +15,7 @@
 !.gitignore
 !.gitmodules
 !makefile
+!Makefile
 !config_examples
 !config_examples/*
 !config_examples/**
