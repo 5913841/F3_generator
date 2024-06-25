@@ -80,11 +80,12 @@ We encapsulate the fine-grained functions needed in the process of traffic gener
   const uint8_t& api_get_packet_l4_protocol(rte_mbuf *m); // return the l4 protocol of the packet, either IPPROTO_TCP or IPPROTO_UDP.
 
   bool api_socket_thscore(Socket *sk); // return true if the socket is in the RSS table.
+  
+  void api_free_mbuf(rte_mbuf* mbuf); // free the mbuf.
 
   Socket* api_tcp_new_socket(Socket *temp_sk); // create a new socket same as the temp_sk and return it.
 
   void api_tcp_validate_socket(Socket *sk); // validate the socket. include the checksum, state, timer.
-
 
   void api_tcp_reply(struct Socket *sk, uint8_t tcp_flags); // send a tcp reply packet to the opposite side of the socket according to the socket state and tcp_flags.
 
@@ -117,6 +118,8 @@ We encapsulate the fine-grained functions needed in the process of traffic gener
   rte_mbuf* api_recv_packet(); // receive a packet from the dpdk NIC.
 
   Socket* api_parse_packet(rte_mbuf *mbuf); // parse the packet and return the five-tuples of the packet, there are just five-tuples valid in the returned packet.
+  
+  Socket* api_tcp_new_socket(Socket *temp_sk); // create a new socket same as the temp_sk and return it.
   
   void api_send_packet(rte_mbuf *mbuf); // send a packet to the dpdk NIC.
 

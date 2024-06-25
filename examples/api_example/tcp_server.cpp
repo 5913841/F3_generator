@@ -37,8 +37,12 @@ int start_test(__rte_unused void *arg1)
             }
             Socket* parse_socket = api::api_parse_packet(m);
             Socket *socket = api::api_flowtable_find_socket(parse_socket);
-            if (socket != nullptr)
-                api::api_process_tcp(socket, m);
+            if (socket == nullptr)
+            {
+                socket = api::api_tcp_new_socket(template_socket);
+                api::api_set_ft_from_parse(socket, parse_socket);
+            }
+            api::api_process_tcp(socket, m);
         } while (true);
         api::api_send_flush();
         api::api_trigger_timers();

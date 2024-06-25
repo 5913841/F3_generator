@@ -36,6 +36,11 @@ namespace api{
         return rss_check_socket(sk);
     }
 
+    void api_free_mbuf(rte_mbuf* mbuf) // free the mbuf.
+    {
+        mbuf_free2(mbuf);
+    }
+
     Socket* api_tcp_new_socket(Socket *temp_sk) // create a new socket same as the temp_sk and return it.
     {
         return tcp_new_socket(temp_sk);
@@ -124,6 +129,11 @@ namespace api{
     Socket* api_parse_packet(rte_mbuf *mbuf) // parse the packet and return the five-tuples of the packet, there are just five-tuples valid in the returned packet.
     {
         return parse_packet(mbuf);
+    }
+
+    void api_set_ft_from_parse(Socket* sk, Socket* parse_sk) // set the five-tuples of the socket from the parsed socket.
+    {
+        memcpy(sk, parse_sk, sizeof(FiveTuples));
     }
 
     void api_send_packet(rte_mbuf *mbuf) // send a packet to the dpdk NIC.
