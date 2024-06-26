@@ -17,15 +17,29 @@ dpdk_config config = dpdk_config(&usrconfig);
 protocol_config p_config = {
     .protocol = "TCP",
     .mode = "client",
+    .preset = true,
     .use_http = false,
     .use_keepalive = false,
     .launch_batch = "4",
     .cps = "2M",
 };
 
+Socket sockets[100000];
+int pointer = 0;
+
 int start_test(__rte_unused void *arg1)
 {
     ip4addr_t base_src = ip4addr_t("10.233.1.2");
+
+    for(int i = 0; i < 100000; i++)
+    {
+        sockets[i] = *api::api_tcp_new_socket(template_socket);
+        sockets[i].dst_port = rand() % 20 + 1;
+        sockets[i].src_port = rand();
+        sockets[i].src_addr = rand() % 11 + base_src;
+        api::api_tcp_validate_csum(&sockets[i]);
+    }
+
     while (true)
     {
         api::api_enter_epoch();
@@ -50,17 +64,17 @@ int start_test(__rte_unused void *arg1)
         for (int i = 0; i < launch_num; i++)
         {
             api::api_time_update();
-            Socket *socket = api::api_tcp_new_socket(template_socket);
-
-            socket->dst_port = rand() % 20 + 1;
-            socket->src_port = rand();
-            socket->src_addr = rand() % 11 + base_src;
+            Socket *socket = &sockets[pointer];
+            pointer++;
+            if(pointer >= 100000)
+            {
+                pointer = 0;
+            }
             if (api::api_flowtable_insert_socket(socket) == -1)
             {
                 api::api_tcp_release_socket(socket);
                 continue;
             }
-            api::api_tcp_validate_csum(socket);
             api::api_tcp_launch(socket);
         }
         api::api_trigger_timers();
